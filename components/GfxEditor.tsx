@@ -501,7 +501,25 @@ useEffect(() => {
     setSelectedId(t.id);
     setTab("text");
   }
+async function goToProCheckout() {
+  try {
+    const guestId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+        : "";
 
+    if (typeof window !== "undefined" && guestId) {
+      localStorage.setItem("gfxlab_guest_id", guestId);
+    }
+
+    window.location.href = `/api/stripe/checkout-pro?guestId=${encodeURIComponent(
+      guestId
+    )}`;
+  } catch (err) {
+    console.error(err);
+    alert("Could not start Pro checkout.");
+  }
+}
   
 
 
@@ -796,28 +814,38 @@ function deselect(e: any) {
 
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-         <select value={projectType} onChange={(e) => setProjectType(e.target.value as ProjectType)} style={miniSelect}>
-  <option value="cover">Cover</option>
-  <option value="flyer">Flyer</option>
-  <option value="social">Social</option>
-</select>
+<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+  <select
+    value={projectType}
+    onChange={(e) => setProjectType(e.target.value as ProjectType)}
+    style={miniSelect}
+  >
+    <option value="cover">Cover</option>
+    <option value="flyer">Flyer</option>
+    <option value="social">Social</option>
+  </select>
 
-          <input
-            ref={filePickerRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              cutoutFromFileFreeAI(f);
-              e.currentTarget.value = "";
-            }}
-          />
+  <button
+    onClick={goToProCheckout}
+    style={upgradeBtn}
+    title="Upgrade to Pro"
+  >
+    Upgrade
+  </button>
 
-          
-        </div>
+  <input
+    ref={filePickerRef}
+    type="file"
+    accept="image/*"
+    style={{ display: "none" }}
+    onChange={(e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      cutoutFromFileFreeAI(f);
+      e.currentTarget.value = "";
+    }}
+  />
+</div>
       </div>
 
       {/* Canvas */}
@@ -1412,7 +1440,16 @@ const miniSelect: React.CSSProperties = {
   outline: "none",
   fontWeight: 800,
 };
-
+const upgradeBtn: React.CSSProperties = {
+  height: 38,
+  padding: "0 14px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.2)",
+  background: "#ffffff",
+  color: "#000000",
+  fontWeight: 900,
+  cursor: "pointer",
+};
 const canvasArea: React.CSSProperties = {
   height: "calc(100vh - 56px - 54px)",
   padding: "10px 12px",
@@ -1578,22 +1615,6 @@ const FONT_OPTIONS = [
   { label: "Arial", value: "Arial" },
   { label: "Bebas Neue", value: "BebasNeue" },
 ];
-const handleExport = async () => {
-  
 
-  const guestId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("gfxlab_guest_id") ||
-        crypto.randomUUID()
-      : "";
-
-  if (typeof window !== "undefined" && guestId) {
-    localStorage.setItem("gfxlab_guest_id", guestId);
-  }
-
-  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(
-    guestId
-  )}`;
-};
 const checkRow: React.CSSProperties = { display: "flex", gap: 8, alignItems: "center" };
 const hint: React.CSSProperties = { padding: 12, fontSize: 12, opacity: 0.75 };
