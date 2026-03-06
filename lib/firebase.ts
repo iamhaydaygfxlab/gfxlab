@@ -1,22 +1,25 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-function cleanEnv(name: string) {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is missing`);
-
-  return value.trim().replace(/^['"]|['"]$/g, "");
-}
-
 const firebaseConfig = {
-  apiKey: cleanEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
-  authDomain: cleanEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-  projectId: cleanEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
-  storageBucket: cleanEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
-  messagingSenderId: cleanEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
-  appId: cleanEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim().replace(/^['"]|['"]$/g, ""),
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim().replace(/^['"]|['"]$/g, ""),
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim().replace(/^['"]|['"]$/g, ""),
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim().replace(/^['"]|['"]$/g, ""),
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim().replace(/^['"]|['"]$/g, ""),
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim().replace(/^['"]|['"]$/g, ""),
 };
 
-export const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+if (
+  !firebaseConfig.apiKey ||
+  !firebaseConfig.authDomain ||
+  !firebaseConfig.projectId ||
+  !firebaseConfig.storageBucket ||
+  !firebaseConfig.messagingSenderId ||
+  !firebaseConfig.appId
+) {
+  throw new Error("Firebase public env vars are missing");
+}
 
+export const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
