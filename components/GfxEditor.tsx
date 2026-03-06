@@ -258,6 +258,7 @@ export default function GfxEditor() {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [projectType, setProjectType] = useState<ProjectType>("cover");
  const presets =
   projectType === "cover"
@@ -506,28 +507,34 @@ useEffect(() => {
 async function goToProCheckout() {
   try {
     const auth = getAuth(app);
-    const user = auth.currentUser;
+
+    let user = auth.currentUser;
 
     if (!user) {
-      alert("You must sign in first.");
+      await new Promise<void>((resolve) => {
+        const unsub = auth.onAuthStateChanged((u) => {
+          user = u;
+          unsub();
+          resolve();
+        });
+      });
+    }
+
+    if (!user) {
+      window.location.href = "/login";
       return;
     }
 
-    const uid = user.uid;
-    const email = user.email || "";
-
     const params = new URLSearchParams();
-
-    if (uid) params.set("uid", uid);
-    if (email) params.set("email", email);
+    params.set("uid", user.uid);
+    if (user.email) params.set("email", user.email);
 
     window.location.href = `/api/stripe/checkout-pro?${params.toString()}`;
   } catch (err) {
     console.error(err);
-    alert("Could not start Pro checkout.");
+    window.location.href = "/login";
   }
 }
-  
 
 
 
@@ -657,20 +664,27 @@ async function goToProCheckout() {
       return next;
     });
   }
-function exportPNG() {
+async function exportPNG() {
   const stage = stageRef.current;
   if (!stage) return;
+
+  setExporting(true);
+
+  await new Promise((r) => setTimeout(r, 60));
 
   const pixelRatio = Math.max(1, Math.round(1 / view.ratio));
   const dataUrl = stage.toDataURL({ pixelRatio });
 
   const a = document.createElement("a");
   a.href = dataUrl;
-  a.download = projectType === "cover"
-    ? "gfxlab-cover.png"
-    : "gfxlab-flyer.png";
+  a.download =
+    projectType === "cover"
+      ? "gfxlab-cover.png"
+      : "gfxlab-flyer.png";
 
   a.click();
+
+  setExporting(false);
 }
 
 function handleExport() {
@@ -871,17 +885,19 @@ function deselect(e: any) {
               ) : (
                 <Rect x={0} y={0} width={view.w} height={view.h} fill="#000000" listening={false} />
               )}
-              {/* BLEED GUIDE */}
-<Rect
-  x={15}
-  y={15}
-  width={view.w - 30}
-  height={view.h - 30}
-  stroke="#ff3b3b"
-  strokeWidth={2}
-  dash={[8,6]}
-  listening={false}
-/>
+             {/* BLEED GUIDE */}
+{!exporting && (
+  <Rect
+    x={15}
+    y={15}
+    width={view.w - 30}
+    height={view.h - 30}
+    stroke="#ff3b3b"
+    strokeWidth={2}
+    dash={[8,6]}
+    listening={false}
+  />
+)}
 
               {guides.map((g, idx) =>
                 g.kind === "v" ? (
@@ -929,8 +945,8 @@ function deselect(e: any) {
                 )
               )}
 
-              {watermarkEnabled && wmImg && (
-                <KImage
+             {watermarkEnabled && wmImg && !exporting && (
+  <KImage
                   image={wmImg}
                   listening={false}
                   opacity={0.25}
