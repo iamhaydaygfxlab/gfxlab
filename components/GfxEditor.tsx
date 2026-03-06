@@ -21,6 +21,8 @@ import FontPanel from "./FontPanel";
 import ImagePanel, { ImageAdjustments } from "./ImagePanel";
 import LayersPanel from "./LayersPanel";
 import ExportButton from "./ExportButton";
+import { getAuth } from "firebase/auth";
+import { app } from "@/lib/firebase";
 
 /** ✅ ADD THIS RIGHT HERE (before Types) */
 async function ensureFontLoaded(fontFamily: string) {
@@ -503,18 +505,23 @@ useEffect(() => {
   }
 async function goToProCheckout() {
   try {
-    const guestId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-        : "";
+    const auth = getAuth(app);
+    const user = auth.currentUser;
 
-    if (typeof window !== "undefined" && guestId) {
-      localStorage.setItem("gfxlab_guest_id", guestId);
+    if (!user) {
+      alert("You must sign in first.");
+      return;
     }
 
-    window.location.href = `/api/stripe/checkout-pro?guestId=${encodeURIComponent(
-      guestId
-    )}`;
+    const uid = user.uid;
+    const email = user.email || "";
+
+    const params = new URLSearchParams();
+
+    if (uid) params.set("uid", uid);
+    if (email) params.set("email", email);
+
+    window.location.href = `/api/stripe/checkout-pro?${params.toString()}`;
   } catch (err) {
     console.error(err);
     alert("Could not start Pro checkout.");
