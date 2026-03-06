@@ -15,6 +15,12 @@ const TABS: { key: AssetType; label: string }[] = [
   { key: "money", label: "Money" },
 ];
 
+function makeAssetUrl(path: string) {
+  return `https://firebasestorage.googleapis.com/v0/b/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/o/${encodeURIComponent(
+    path
+  )}?alt=media`;
+}
+
 export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) => void }) {
   const [type, setType] = useState<AssetType>("background");
   const [assets, setAssets] = useState<FireAsset[]>([]);
@@ -38,7 +44,7 @@ export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) =>
   }, [type]);
 
   function pickAsset(a: FireAsset) {
-    onPick({ src: a.src, name: a.name, type: a.type });
+    onPick({ src: makeAssetUrl(a.path), name: a.name, type: a.type });
   }
 
   return (
@@ -85,7 +91,7 @@ export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) =>
             title={a.name || "asset"}
           >
             <img
-              src={a.src}
+              src={makeAssetUrl(a.path)}
               alt={a.name || "asset"}
               style={{
                 maxWidth: "100%",
