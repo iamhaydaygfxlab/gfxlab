@@ -1,13 +1,11 @@
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, initializeFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
 function cleanEnv(name: string) {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is missing`);
 
-  return value
-    .trim()
-    .replace(/^['"]|['"]$/g, "");
+  return value.trim().replace(/^['"]|['"]$/g, "");
 }
 
 const firebaseConfig = {
@@ -21,9 +19,4 @@ const firebaseConfig = {
 
 export const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-export const db =
-  typeof window === "undefined"
-    ? getFirestore(app)
-    : initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-      });
+export const db = getFirestore(app);
