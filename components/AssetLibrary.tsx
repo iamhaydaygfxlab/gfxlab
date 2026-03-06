@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { fetchAssets, type AssetType, type FireAsset } from "@/lib/assets";
-import { getStorage, ref, getDownloadURL } from "firebase/storage";
 
 export type AssetItem = { src: string; name?: string; type?: AssetType };
 
@@ -38,10 +37,8 @@ export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) =>
     };
   }, [type]);
 
-  async function pickAsset(a: FireAsset) {
-    const storage = getStorage();
-    const url = await getDownloadURL(ref(storage, a.path));
-    onPick({ src: url, name: a.name, type: a.type });
+  function pickAsset(a: FireAsset) {
+    onPick({ src: a.src, name: a.name, type: a.type });
   }
 
   return (
@@ -69,45 +66,37 @@ export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) =>
       {loading && <div style={{ opacity: 0.8 }}>Loading…</div>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-  {assets.map((a) => (
-    <button
-      key={a.id}
-      onClick={async () => {
-        const storage = getStorage();
-        const url = await getDownloadURL(ref(storage, a.path));
-        onPick({ src: url, name: a.name, type: a.type });
-      }}
-      style={{
-        borderRadius: 14,
-        overflow: "hidden",
-        border: "1px solid rgba(255,255,255,0.18)",
-        background: "rgba(0,0,0,0.25)", // ✅ no white card
-        padding: 10,
-        cursor: "pointer",
-        height: 120,                  // ✅ forces equal height
-        display: "flex",
-        alignItems: "center",         // ✅ centers image
-        justifyContent: "center",     // ✅ centers image
-      }}
-      title={a.name || "asset"}
-    >
-      <img
-        src={`https://firebasestorage.googleapis.com/v0/b/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/o/${encodeURIComponent(
-          a.path
-        )}?alt=media`}
-        alt={a.name || "asset"}
-        style={{
-          maxWidth: "100%",
-          maxHeight: "100%",
-          objectFit: "contain",  // ✅ prevents cropping + keeps even
-          display: "block",
-        }}
-      />
-    </button>
-  ))}
-</div>
-        
-      
+        {assets.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => pickAsset(a)}
+            style={{
+              borderRadius: 14,
+              overflow: "hidden",
+              border: "1px solid rgba(255,255,255,0.18)",
+              background: "rgba(0,0,0,0.25)",
+              padding: 10,
+              cursor: "pointer",
+              height: 120,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title={a.name || "asset"}
+          >
+            <img
+              src={a.src}
+              alt={a.name || "asset"}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

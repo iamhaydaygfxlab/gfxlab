@@ -23,6 +23,8 @@ import LayersPanel from "./LayersPanel";
 import ExportButton from "./ExportButton";
 import { getAuth } from "firebase/auth";
 import { app } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 /** ✅ ADD THIS RIGHT HERE (before Types) */
 async function ensureFontLoaded(fontFamily: string) {
@@ -258,6 +260,29 @@ export default function GfxEditor() {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
   const [paid, setPaid] = useState(false);
+  useEffect(() => {
+  const auth = getAuth(app);
+
+  const unsubAuth = auth.onAuthStateChanged((user) => {
+    if (!user) return;
+
+    const ref = doc(db, "users", user.uid);
+
+    const unsubDoc = onSnapshot(ref, (snap) => {
+      const data = snap.data();
+
+      if (data?.pro === true) {
+        setPaid(true);
+      } else {
+        setPaid(false);
+      }
+    });
+
+    return () => unsubDoc();
+  });
+
+  return () => unsubAuth();
+}, []);
   const [exporting, setExporting] = useState(false);
   const [projectType, setProjectType] = useState<ProjectType>("cover");
  const presets =
@@ -818,6 +843,21 @@ function deselect(e: any) {
             alt="GFXlab"
             style={{ height: 60, width: 60, objectFit: "contain" }}
           />
+          {paid && (
+  <div
+    style={{
+      background: "#FFD700",
+      color: "#000",
+      padding: "4px 10px",
+      borderRadius: 8,
+      fontWeight: 800,
+      fontSize: 12,
+      marginLeft: 6
+    }}
+  >
+    PRO
+  </div>
+)}
            <style jsx global>{`
       .sheetBody input,
       .sheetBody select,
@@ -978,9 +1018,9 @@ function deselect(e: any) {
         <TabBtn label="Text" active={tab === "text"} onClick={() => setTab(tab === "text" ? "none" : "text")} />
         <TabBtn label="Adjust" active={tab === "adjust"} onClick={() => setTab(tab === "adjust" ? "none" : "adjust")} />
         <TabBtn label="Layers" active={tab === "layers"} onClick={() => setTab(tab === "layers" ? "none" : "layers")} />
-        <ExportButton
+<ExportButton
   label="Export $5"
-  onExport={exportPNG}
+  onExport={handleExport}
   buttonStyle={{
     flex: 1,
     padding: "19px 11px",
