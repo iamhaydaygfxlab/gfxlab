@@ -1,20 +1,57 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const url = searchParams.get("url");
-  if (!url) return new NextResponse("Missing url", { status: 400 });
+export async function GET(req: NextRequest) {
+  try {
+    const rawUrl = req.nextUrl.searchParams.get("url");
 
-  const res = await fetch(url);
-  if (!res.ok) return new NextResponse("Fetch failed", { status: 400 });
+    if (!rawUrl) {
+      return new NextResponse("Missing url", { status: 400 });
+    }
 
-  const contentType = res.headers.get("content-type") ?? "image/jpeg";
-  const buf = await res.arrayBuffer();
+    // IMPORTANT:
+    // Do NOT decode Firebase Storage URLs here.
+    // searchParams.get("url") already gives us the right value.
+    const imageUrl = rawUrl;
 
-  return new NextResponse(buf, {
-    headers: {
-      "Content-Type": contentType,
-      "Cache-Control": "public, max-age=86400",
-    },
-  });
+    if (
+      !imageUrl.startsWith("http://") &&
+      !imageUrl.startsWith("https://")
+    ) {
+      return new NextResponse("Invalid url", { status: 400 });
+    }
+
+    const upstream = await fetch(imageUrl, {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        Accept: "image/*,*/*",
+      },
+      cache: "no-store",
+    });
+
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => "");
+      console.error("UPSTREAM IMAGE PROXY FAILED:", upstream.status, text);
+      return new NextResponse(
+        `Upstream failed: ${upstream.status}\n${text}`,
+        { status: upstream.status }
+      );
+    }
+
+    const contentType =
+      upstream.headers.get("content-type") || "application/octet-stream";
+
+    const bytes = await upstream.arrayBuffer();
+
+    return new NextResponse(bytes, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+  } catch (error) {
+    console.error("IMAGE PROXY ERROR:", error);
+    return new NextResponse("Proxy error", { status: 500 });
+  }
 }

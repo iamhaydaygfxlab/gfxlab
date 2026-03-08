@@ -21,10 +21,14 @@ import FontPanel from "./FontPanel";
 import ImagePanel, { ImageAdjustments } from "./ImagePanel";
 import LayersPanel from "./LayersPanel";
 import ExportButton from "./ExportButton";
-import { getAuth } from "firebase/auth";
-import { app } from "@/lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getAuth, signOut } from "firebase/auth";
+import {doc,onSnapshot,collection,addDoc,updateDoc,serverTimestamp,} from "firebase/firestore";
+import { app, db } from "@/lib/firebase";
+import TemplateLibrary from "./TemplateLibrary";
+import { type FireTemplate } from "@/lib/templates";
+import { useRouter } from "next/navigation";
+
+
 
 /** ✅ ADD THIS RIGHT HERE (before Types) */
 async function ensureFontLoaded(fontFamily: string) {
@@ -115,6 +119,7 @@ function nodeIsGone(node: Konva.Node | null | undefined) {
   return Boolean(anyNode?.isDestroyed?.() || anyNode?._isDestroyed);
 }
 
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -122,11 +127,25 @@ function uid() {
 export function loadHtmlImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous"; // ✅ always
+    img.crossOrigin = ""; // ✅ always
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Image failed to load (CORS): " + src));
     img.src = src;
+    img.decoding = "async";
   });
+}
+function getDistance(p1: any, p2: any) {
+  return Math.sqrt(
+    (p2.x - p1.x) * (p2.x - p1.x) +
+    (p2.y - p1.y) * (p2.y - p1.y)
+  );
+}
+
+function getCenter(p1: any, p2: any) {
+  return {
+    x: (p1.x + p2.x) / 2,
+    y: (p1.y + p2.y) / 2,
+  };
 }
 
 
@@ -147,15 +166,15 @@ function defaultText(): TextItem {
   return {
     id: uid(),
     kind: "text",
-    x: 50,
-    y: 150,
+    x: 210,
+    y: 180,
     rotation: 0,
-    text: "Lets Create",
+    text: "Create",
     fontFamily: "Impact",
     fontSize: 60,
     fontWeight: 800,
     fontStyle: "normal",
-    fill: "#ffffff",
+    fill: "#ff0000",
     align: "center",
     letterSpacing: 0,
     lineHeight: 1.15,
@@ -255,35 +274,143 @@ const SOCIAL_PRESETS: SizePreset[] = [
   { id: "linkedin_banner", label: "LinkedIn Banner (1584×396)", w: 1584, h: 396 },
 ];
 
+const ALL_PRESETS: SizePreset[] = [
+  ...COVER_PRESETS,
+  ...FLYER_PRESETS,
+  ...SOCIAL_PRESETS,
+];
+
+function openGfxDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("gfxlab-db", 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains("pending")) {
+        db.createObjectStore("pending");
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function savePendingDesign(key: string, value: unknown) {
+  const db = await openGfxDb();
+
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction("pending", "readwrite");
+    const store = tx.objectStore("pending");
+
+    store.put(value, key);
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadPendingDesign<T = any>(key: string): Promise<T | null> {
+  const db = await openGfxDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("pending", "readonly");
+    const store = tx.objectStore("pending");
+    const req = store.get(key);
+
+    req.onsuccess = () => resolve((req.result as T) ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deletePendingDesign(key: string) {
+  const db = await openGfxDb();
+
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction("pending", "readwrite");
+    const store = tx.objectStore("pending");
+
+    store.delete(key);
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+
 /** ---------------- Main ---------------- */
 export default function GfxEditor() {
+  const router = useRouter();
+
+async function handleLogout() {
+  try {
+    const auth = getAuth();
+    await signOut(auth);
+    router.replace("/");
+  } catch (err) {
+    console.error("Logout failed", err);
+  }
+}
+
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
   const [paid, setPaid] = useState(false);
+ 
+  const [exporting, setExporting] = useState(false);
+  const [checkoutRestoreReady, setCheckoutRestoreReady] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
+const [projectName, setProjectName] = useState("Untitled Design");
+const [saving, setSaving] = useState(false);
+const sheetHeight =
+  tab === "assets"
+    ? "min(320px, 32vh)"
+    : tab === "text"
+    ? "min(300px, 34vh)"
+    : tab === "adjust"
+    ? "min(190px, 22vh)"
+    : tab === "layers"
+    ? "min(240px, 28vh)"
+    : tab === "export"
+    ? "min(180px, 20vh)"
+    : "min(220px, 24vh)";
+
+
   useEffect(() => {
   const auth = getAuth(app);
 
   const unsubAuth = auth.onAuthStateChanged((user) => {
-    if (!user) return;
+    console.log("AUTH USER:", user);
 
-    const ref = doc(db, "users", user.uid);
+    if (!user) {
+      setPaid(false);
+      return;
+    }
 
-    const unsubDoc = onSnapshot(ref, (snap) => {
-      const data = snap.data();
+    const userRef = doc(db, "users", user.uid);
 
-      if (data?.pro === true) {
-        setPaid(true);
-      } else {
+    const unsubDoc = onSnapshot(
+      userRef,
+      (snap) => {
+        console.log("DOC ID:", user.uid);
+        console.log("DOC EXISTS:", snap.exists());
+        console.log("DOC DATA:", snap.data());
+
+        const data = snap.data();
+        setPaid(data?.pro === true);
+      },
+      (error) => {
+        console.error("PRO LISTENER ERROR:", error);
         setPaid(false);
       }
-    });
+    );
 
     return () => unsubDoc();
   });
 
   return () => unsubAuth();
 }, []);
-  const [exporting, setExporting] = useState(false);
+
+
   const [projectType, setProjectType] = useState<ProjectType>("cover");
  const presets =
   projectType === "cover"
@@ -302,7 +429,8 @@ function toSafeSrc(src: string) {
   }
 
   if (src.startsWith("http://") || src.startsWith("https://")) {
-    return `/api/image-proxy?url=${encodeURIComponent(src)}`;
+    const params = new URLSearchParams({ url: src });
+    return `/api/image-proxy?${params.toString()}`;
   }
 
   return src;
@@ -345,21 +473,17 @@ const targetMaxH = Math.round(view.h * 0.85);
   }
 }
 
- useEffect(() => {
-  const firstPreset =
-    projectType === "cover"
-      ? COVER_PRESETS[0]
-      : projectType === "flyer"
-      ? FLYER_PRESETS[0]
-      : SOCIAL_PRESETS[0];
+useEffect(() => {
+  const currentPresetStillValid = presets.some((p) => p.id === presetId);
+  if (currentPresetStillValid) return;
 
-  setPresetId(firstPreset.id);
-}, [projectType]);
+  setPresetId(presets[0].id);
+}, [projectType, presets, presetId]);
 
-  const preset = useMemo(
-    () => presets.find((x) => x.id === presetId) ?? presets[0],
-    [presets, presetId]
-  );
+const preset = useMemo(
+  () => ALL_PRESETS.find((x: SizePreset) => x.id === presetId) ?? presets[0],
+  [presetId, presets]
+);
 
   const [viewportTick, setViewportTick] = useState(0);
   useEffect(() => {
@@ -386,22 +510,43 @@ useEffect(() => {
   ro.observe(el);
   return () => ro.disconnect();
 }, []);
- const view = useMemo(() => {
-  const padding = 0; // host already defines available space
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const params = new URLSearchParams(window.location.search);
+  const exportStatus = params.get("export");
+
+  if (exportStatus === "success") {
+    sessionStorage.setItem("paid_export", "true");
+
+    const cleanUrl = `${window.location.pathname}`;
+    window.history.replaceState({}, "", cleanUrl);
+  }
+}, []);
+
+
+const view = useMemo(() => {
+  const padding = 0;
+
+  // reserve space when the bottom panel is open
+const panelReserve = tab !== "none" ? 150 : 0;
+
   const safeW = Math.max(240, hostSize.w - padding * 2);
-  const safeH = Math.max(240, hostSize.h - padding * 2);
+  const safeH = Math.max(240, hostSize.h - panelReserve - padding * 2);
 
   const ratio = Math.min(safeW / preset.w, safeH / preset.h);
 
   return {
-    w: Math.max(240, Math.round(preset.w * ratio)),
-    h: Math.max(240, Math.round(preset.h * ratio)),
+    w: Math.max(120, Math.round(preset.w * ratio)),
+    h: Math.max(120, Math.round(preset.h * ratio)),
     ratio,
   };
-}, [preset, hostSize]);
+}, [preset, hostSize, tab]);
 
   const [items, setItems] = useState<Item[]>([defaultText()]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  
 
   const [bgSrc, setBgSrc] = useState<string | null>(null);
   const [bgImg, setBgImg] = useState<HTMLImageElement | null>(null);
@@ -409,6 +554,49 @@ useEffect(() => {
   const WATERMARK_SRC = "/logo.png";
   const watermarkEnabled = true;
   const [wmImg, setWmImg] = useState<HTMLImageElement | null>(null);
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  (async () => {
+    try {
+      const parsed = await loadPendingDesign<any>("gfxlab_pending_export_design");
+
+      if (!parsed) {
+        setCheckoutRestoreReady(true);
+        return;
+      }
+
+      if (parsed?.items) setItems(parsed.items);
+      if (typeof parsed?.bgSrc !== "undefined") setBgSrc(parsed.bgSrc);
+      if (parsed?.projectType) setProjectType(parsed.projectType);
+      if (parsed?.presetId) setPresetId(parsed.presetId);
+
+      window.setTimeout(() => {
+        setCheckoutRestoreReady(true);
+      }, 700);
+    } catch (err) {
+      console.error("Could not restore pending export design:", err);
+      setCheckoutRestoreReady(true);
+    }
+  })();
+}, []);
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  if (!checkoutRestoreReady) return;
+
+  const paidExport = sessionStorage.getItem("paid_export");
+  if (paidExport !== "true") return;
+
+const t = window.setTimeout(async () => {
+  await exportPNG();
+  sessionStorage.removeItem("paid_export");
+  await deletePendingDesign("gfxlab_pending_export_design");
+}, 1400);
+
+  return () => window.clearTimeout(t);
+}, [checkoutRestoreReady, bgImg, presetId, projectType]);
+
+
 
   useEffect(() => {
     let cancelled = false;
@@ -430,9 +618,14 @@ useEffect(() => {
     return () => { cancelled = true; };
   }, [bgSrc]);
 
+
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
+const [stageScale, setStageScale] = useState(1);
+const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
+const lastDist = useRef(0);
+const lastCenter = useRef({ x: 0, y: 0 });
 
 
 
@@ -529,6 +722,423 @@ useEffect(() => {
     setSelectedId(t.id);
     setTab("text");
   }
+
+function makeTextItem(overrides: Partial<TextItem>): TextItem {
+  return {
+    ...defaultText(),
+    ...overrides,
+    id: uid(),
+    kind: "text",
+  };
+}
+
+/* ---------------- STARTER TEMPLATES ---------------- */
+
+function loadCoverTemplate() {
+  setProjectType("cover");
+  setPresetId("cov-3000");
+  setBgSrc("/templates/cover-template.jpg");
+
+const artist = makeTextItem({
+  text: "ARTIST NAME",
+  x: view.w / 2,
+  y: view.h * 0.25,
+  align: "center",
+  fontSize: view.w * 0.09,
+  fontFamily: "Impact",
+  fontWeight: 900,
+  fill: "#ffffff",
+});
+
+  const title = makeTextItem({
+    text: "ALBUM TITLE",
+  x: view.w / 2,
+  y: view.h * 0.45,
+  align: "center",
+  fontSize: view.w * 0.15,
+  fontFamily: "Impact",
+  fontWeight: 900,
+  fill: "#ffffff",
+});
+const producer = makeTextItem({
+    text: "put label name here",
+    x: view.w / 2,
+    y: view.h * 0.04,
+    align: "center",
+    fontSize: view.w * 0.03,
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  const feature = makeTextItem({
+    text: "FEAT. FEATURE ARTIST",
+    x: view.w / 2,
+    y: view.h * 0.65,
+    align: "center",
+    fontSize: view.w * 0.032,
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  setItems([artist, title, producer, feature]);
+
+  setSelectedId(title.id);
+  setTab("text");
+}
+
+function loadFlyerStarterTemplate() {
+  setProjectType("flyer");
+  setPresetId("fly-1080x1350");
+  setBgSrc("/templates/flyer-template.jpg");
+
+  const eventTitle = makeTextItem({
+    text: "EVENT TITLE",
+    x: view.w / 2,
+    y: view.h * 0.18,
+    align: "center",
+    fontSize: view.w * 0.11,
+    fontFamily: "Impact",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  const djName = makeTextItem({
+    text: "DJ NAME",
+    x: view.w / 2,
+    y: view.h * 0.30,
+    align: "center",
+    fontSize: view.w * 0.15,
+    fontFamily: "Impact",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  const dateText = makeTextItem({
+    text: "FRIDAY, MARCH 22",
+    x: view.w / 2,
+    y: view.h * 0.50,
+    align: "center",
+    fontSize: view.w * 0.05,
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#d1b15a",
+  });
+
+  const timeText = makeTextItem({
+    text: "10:00 PM",
+    x: view.w / 2,
+    y: view.h * 0.58,
+    align: "center",
+    fontSize: view.w * 0.045,
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  const addressText = makeTextItem({
+    text: "123 MAIN ST, TACOMA WA",
+    x: view.w / 2,
+    y: view.h * 1,
+    align: "center",
+    fontSize: view.w * 0.04,
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  const priceText = makeTextItem({
+    text: "$20 ENTRY",
+    x: view.w / 2,
+    y: view.h * 0.76,
+    align: "center",
+    fontSize: view.w * 0.055,
+    fontFamily: "Impact",
+    fontWeight: 700,
+    fill: "#d1b15a",
+  });
+
+  setItems([eventTitle, djName, dateText, timeText, addressText, priceText]);
+  setSelectedId(eventTitle.id);
+  setTab("text");
+}
+
+function loadSocialStarterTemplate() {
+  setProjectType("cover");
+  setPresetId("ig-square");
+  setBgSrc("/templates/social-template.jpg");
+
+  const title = makeTextItem({
+    text: "ARTIST NAME",
+    x: view.w / 2,
+    y: view.h * 0.20,
+    align: "center",
+    fontSize: view.w * 0.12,
+    fontFamily: "Impact",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  const dropText = makeTextItem({
+    text: "NEW DROP",
+    x: view.w / 2,
+    y: view.h * 0.35,
+    align: "center",
+    fontSize: view.w * 0.10,
+    fontFamily: "Impact",
+    fontWeight: 700,
+    fill: "#d1b15a",
+  });
+
+  const outNow = makeTextItem({
+    text: "OUT NOW",
+    x: view.w / 2,
+    y: view.h * 0.50,
+    align: "center",
+    fontSize: view.w * 0.14,
+    fontFamily: "Impact",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  const streamToday = makeTextItem({
+    text: "STREAM TODAY",
+    x: view.w / 2,
+    y: view.h * 0.68,
+    align: "center",
+    fontSize: view.w * 0.07,
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#d1b15a",
+  });
+
+  const platforms = makeTextItem({
+    text: "SPOTIFY • APPLE MUSIC • YOUTUBE",
+    x: view.w / 2,
+    y: view.h * 0.82,
+    align: "center",
+    fontSize: view.w * 0.04,
+    fontFamily: "Arial",
+    fontWeight: 600,
+    fill: "#ffffff",
+  });
+
+  setItems([title, dropText, outNow, streamToday, platforms]);
+  setSelectedId(title.id);
+  setTab("text");
+}
+
+/* ---------------- OLD TEMPLATE FUNCTIONS ---------------- */
+
+function loadMixtapeTemplate() {
+  setBgSrc("/templates/mixtape-bg.jpg");
+
+  const artist: TextItem = {
+    ...defaultText(),
+    id: uid(),
+    text: "ARTIST NAME",
+    fontSize: 90,
+    y: 120,
+  };
+
+  const title: TextItem = {
+    ...defaultText(),
+    id: uid(),
+    text: "MIXTAPE TITLE",
+    fontSize: 70,
+    y: 260,
+  };
+
+  setItems([artist, title]);
+}
+
+function loadFlyerTemplate() {
+  setBgSrc("/templates/flyer-bg.jpg");
+
+  const title: TextItem = {
+    ...defaultText(),
+    id: uid(),
+    text: "LIVE EVENT",
+    fontSize: 100,
+    y: 120,
+  };
+
+  const details: TextItem = {
+    ...defaultText(),
+    id: uid(),
+    text: "FRIDAY NIGHT",
+    fontSize: 60,
+    y: 280,
+  };
+
+  setItems([title, details]);
+}
+
+function loadInstagramTemplate() {
+  setBgSrc("/templates/social-bg.jpg");
+
+  const headline: TextItem = {
+    ...defaultText(),
+    id: uid(),
+    text: "NEW DROP",
+    fontSize: 90,
+    y: 200,
+  };
+
+  setItems([headline]);
+}
+
+function loadPodcastTemplate() {
+  setBgSrc("/templates/podcast-bg.jpg");
+
+  const title: TextItem = {
+    ...defaultText(),
+    id: uid(),
+    text: "PODCAST NAME",
+    fontSize: 90,
+    y: 200,
+  };
+
+  setItems([title]);
+}
+function addArtistTemplate() {
+const artist = makeTextItem({
+  text: "ARTIST NAME",
+  x: view.w / 2,
+  y: view.h * 0.15,
+  align: "center",
+  fontSize: view.w * 0.09,
+  fontFamily: "Impact",
+  fontWeight: 900,
+  fill: "#ffffff",
+});
+
+  const title = makeTextItem({
+    text: "Album Title",
+    x: Math.round(view.w * 0.16),
+    y: Math.round(view.h * 0.72),
+    fontSize: Math.round(view.w * 0.06),
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#d1b15a",
+  });
+
+  setItems((prev) => [...prev, artist, title]);
+  setSelectedId(title.id);
+  setTab("text");
+}
+
+function addFlyerTemplate() {
+  const headline = makeTextItem({
+    text: "LIVE TONIGHT",
+    x: Math.round(view.w * 0.12),
+    y: Math.round(view.h * 0.12),
+    fontSize: Math.round(view.w * 0.09),
+    fontFamily: "Impact",
+    fontWeight: 900,
+    fill: "#ffffff",
+  });
+
+  const sub = makeTextItem({
+    text: "DJ KAY",
+    x: Math.round(view.w * 0.2),
+    y: Math.round(view.h * 0.3),
+    fontSize: Math.round(view.w * 0.075),
+    fontFamily: "Arial",
+    fontWeight: 800,
+    fill: "#d1b15a",
+  });
+
+  const details = makeTextItem({
+    text: "FRIDAY • 10PM • TACOMA",
+    x: Math.round(view.w * 0.14),
+    y: Math.round(view.h * 0.84),
+    fontSize: Math.round(view.w * 0.04),
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#ffffff",
+  });
+
+  setItems((prev) => [...prev, headline, sub, details]);
+  setSelectedId(headline.id);
+  setTab("text");
+}
+
+function addQuoteTemplate() {
+ const quote = makeTextItem({
+  text: "YOUR QUOTE HERE",
+    x: Math.round(view.w * 0.1),
+    y: Math.round(view.h * 0.32),
+    fontSize: Math.round(view.w * 0.055),
+    fontFamily: "Arial",
+    fontWeight: 800,
+    fill: "#ffffff",
+    align: "center",
+  });
+
+  const author = makeTextItem({
+    text: "- @username",
+    x: Math.round(view.w * 0.28),
+    y: Math.round(view.h * 0.68),
+    fontSize: Math.round(view.w * 0.035),
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#d1b15a",
+  });
+
+  setItems((prev) => [...prev, quote, author]);
+  setSelectedId(quote.id);
+  setTab("text");
+}
+
+function addPodcastTemplate() {
+  const show = makeTextItem({
+    text: "PODCAST NAME",
+    x: Math.round(view.w * 0.1),
+    y: Math.round(view.h * 0.14),
+    fontSize: Math.round(view.w * 0.075),
+    fontFamily: "Impact",
+    fontWeight: 900,
+    fill: "#ffffff",
+  });
+
+  const episode = makeTextItem({
+    text: "EPISODE 001",
+    x: Math.round(view.w * 0.12),
+    y: Math.round(view.h * 0.74),
+    fontSize: Math.round(view.w * 0.045),
+    fontFamily: "Arial",
+    fontWeight: 700,
+    fill: "#d1b15a",
+  });
+
+  setItems((prev) => [...prev, show, episode]);
+  setSelectedId(show.id);
+  setTab("text");
+}
+function loadTemplate(template: FireTemplate) {
+  setProjectType(template.type);
+  setPresetId(template.presetId);
+  setBgSrc(template.bgSrc);
+
+  const mappedItems = template.items.map((item) =>
+    makeTextItem({
+      text: item.text,
+      x: item.x,
+      y: item.y,
+      align: item.align ?? "left",
+      fontSize: item.fontSize,
+      fontFamily: item.fontFamily,
+      fontWeight: item.fontWeight,
+      fill: item.fill,
+    })
+  );
+
+  setItems(mappedItems);
+  setSelectedId(mappedItems[0]?.id ?? null);
+  setTab("text");
+}
 async function goToProCheckout() {
   try {
     const auth = getAuth(app);
@@ -563,49 +1173,31 @@ async function goToProCheckout() {
 
 
 
-  async function addImageFromFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
+async function addImageFromFile(file: File) {
+  const reader = new FileReader();
+
+  reader.onload = async () => {
+    try {
       const src = String(reader.result);
+      const img = await loadHtmlImage(src);
+
+      const targetMaxW = Math.round(view.w * 0.7);
+      const targetMaxH = Math.round(view.h * 0.7);
+
+      const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
+
+      const w = Math.max(60, Math.round(img.width * ratio));
+      const h = Math.max(60, Math.round(img.height * ratio));
+
       const imgItem: ImageItem = {
         id: uid(),
         kind: "image",
-        x: Math.round(view.w * 0.2),
-        y: Math.round(view.h * 0.2),
+        x: Math.round((view.w - w) / 2),
+        y: Math.round((view.h - h) / 2),
         rotation: 0,
         src,
-        width: Math.round(view.w * 0.55),
-        height: Math.round(view.w * 0.55),
-        adj: defaultAdj(),
-      };
-      setItems((prev) => [...prev, imgItem]);
-      setSelectedId(imgItem.id);
-      setTab("adjust");
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function setBackgroundFromFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => setBgSrc(String(reader.result));
-    reader.readAsDataURL(file);
-  }
-
-  async function cutoutFromFileFreeAI(file: File) {
-    try {
-      setCutoutLoading(true);
-
-      const pngDataUrl = await cutoutPersonToPngDataUrl(file);
-
-      const imgItem: ImageItem = {
-        id: uid(),
-        kind: "image",
-        x: Math.round(view.w * 0.2),
-        y: Math.round(view.h * 0.2),
-        rotation: 0,
-        src: pngDataUrl,
-        width: Math.round(view.w * 0.55),
-        height: Math.round(view.w * 0.55),
+        width: w,
+        height: h,
         adj: defaultAdj(),
       };
 
@@ -614,16 +1206,147 @@ async function goToProCheckout() {
       setTab("adjust");
     } catch (err) {
       console.error(err);
-      alert("Cutout failed. Try a different photo.");
-    } finally {
-      setCutoutLoading(false);
+      alert("Could not load that image.");
     }
+  };
+
+  reader.readAsDataURL(file);
+}
+  async function setBackgroundFromFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => setBgSrc(String(reader.result));
+    reader.readAsDataURL(file);
   }
+
+async function cutoutFromFileFreeAI(file: File) {
+  try {
+    setCutoutLoading(true);
+
+    const pngDataUrl = await cutoutPersonToPngDataUrl(file);
+    const img = await loadHtmlImage(pngDataUrl);
+
+    const targetMaxW = Math.round(view.w * 0.7);
+    const targetMaxH = Math.round(view.h * 0.7);
+
+    const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
+
+    const w = Math.max(60, Math.round(img.width * ratio));
+    const h = Math.max(60, Math.round(img.height * ratio));
+
+    const imgItem: ImageItem = {
+      id: uid(),
+      kind: "image",
+      x: Math.round((view.w - w) / 2),
+      y: Math.round((view.h - h) / 2),
+      rotation: 0,
+      src: pngDataUrl,
+      width: w,
+      height: h,
+      adj: defaultAdj(),
+    };
+
+    setItems((prev) => [...prev, imgItem]);
+    setSelectedId(imgItem.id);
+    setTab("adjust");
+  } catch (err) {
+    console.error(err);
+    alert("Cutout failed. Try a different photo.");
+  } finally {
+    setCutoutLoading(false);
+  }
+}
 
   function updateSelectedText(next: Partial<TextItem>) {
     if (!selectedText) return;
     updateItem(selectedText.id, { ...selectedText, ...next });
   }
+
+function applyGlowText() {
+  if (!selectedText) return;
+
+  updateSelectedText({
+    fill: "#ffffff",
+    shadowEnabled: true,
+    shadowColor: "#d1b15a",
+    shadowBlur: 18,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    shadowOpacity: 1,
+    strokeEnabled: false,
+    style3d: "none",
+  });
+}
+
+function applyNeonText() {
+  if (!selectedText) return;
+
+  updateSelectedText({
+    fill: "#7df9ff",
+    shadowEnabled: true,
+    shadowColor: "#7df9ff",
+    shadowBlur: 20,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    shadowOpacity: 1,
+    strokeEnabled: true,
+    strokeColor: "#ffffff",
+    strokeWidth: 2,
+    style3d: "none",
+  });
+}
+
+function applyGoldText() {
+  if (!selectedText) return;
+
+  updateSelectedText({
+    fill: "#d1b15a",
+    shadowEnabled: true,
+    shadowColor: "#000000",
+    shadowBlur: 8,
+    shadowOffsetX: 3,
+    shadowOffsetY: 4,
+    shadowOpacity: 0.5,
+    strokeEnabled: true,
+    strokeColor: "#8a6d2f",
+    strokeWidth: 2,
+    style3d: "soft",
+  });
+}
+
+function applyHardShadowText() {
+  if (!selectedText) return;
+
+  updateSelectedText({
+    fill: "#ffffff",
+    shadowEnabled: true,
+    shadowColor: "#000000",
+    shadowBlur: 0,
+    shadowOffsetX: 8,
+    shadowOffsetY: 8,
+    shadowOpacity: 1,
+    strokeEnabled: false,
+    style3d: "hard",
+  });
+}
+
+function applyCleanTitleText() {
+  if (!selectedText) return;
+
+  updateSelectedText({
+    fill: "#ffffff",
+    shadowEnabled: false,
+    shadowColor: "#000000",
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    shadowOpacity: 0,
+    strokeEnabled: false,
+    strokeColor: "#000000",
+    strokeWidth: 0,
+    style3d: "none",
+  });
+}
+
 
   function updateSelectedImage(nextAdj: ImageAdjustments) {
     if (!selectedImage) return;
@@ -644,6 +1367,66 @@ async function goToProCheckout() {
 
   setItems((prev) => prev.filter((i) => i.id !== selectedId));
   setSelectedId(null);
+}
+function duplicateSelected() {
+  if (!selectedId) return;
+
+  const current = items.find((i) => i.id === selectedId);
+  if (!current) return;
+
+  const copy = {
+    ...current,
+    id: uid(),
+    x: current.x + 20,
+    y: current.y + 20,
+  } as Item;
+
+  setItems((prev) => [...prev, copy]);
+  setSelectedId(copy.id);
+}
+
+function alignSelectedCenterX() {
+  if (!selectedId) return;
+
+  const node = nodeMapRef.current[selectedId];
+  if (!node) return;
+
+  const box = node.getClientRect();
+
+  const newX = Math.round(view.w / 2 - box.width / 2);
+
+  updateItem(selectedId, { x: newX });
+}
+
+function alignSelectedCenterY() {
+  if (!selectedId) return;
+
+  const current = items.find((i) => i.id === selectedId);
+  if (!current) return;
+
+  if (current.kind === "text") {
+    updateItem(current.id, { y: Math.round(view.h / 2 - 30) });
+  } else {
+    updateItem(current.id, { y: Math.round((view.h - current.height) / 2) });
+  }
+}
+
+function alignSelectedTop() {
+  if (!selectedId) return;
+  updateItem(selectedId, { y: 20 });
+}
+
+function alignSelectedBottom() {
+  if (!selectedId) return;
+
+  const current = items.find((i) => i.id === selectedId);
+  if (!current) return;
+
+  if (current.kind === "text") {
+    updateItem(current.id, { y: Math.round(view.h - 100) });
+  } else {
+    updateItem(current.id, { y: Math.round(view.h - current.height - 20) });
+  }
 }
 
   function moveLayerUp(id: string) {
@@ -693,27 +1476,169 @@ async function exportPNG() {
   const stage = stageRef.current;
   if (!stage) return;
 
+  console.log("EXPORTING WITH:", {
+    projectType,
+    presetId,
+    presetWidth: preset.w,
+    presetHeight: preset.h,
+  });
+
   setExporting(true);
 
-  await new Promise((r) => setTimeout(r, 60));
+  // let React hide watermark / bleed / transformer
+  await new Promise((resolve) => setTimeout(resolve, 120));
 
-  const pixelRatio = Math.max(1, Math.round(1 / view.ratio));
-  const dataUrl = stage.toDataURL({ pixelRatio });
+  // wait for repaint
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
 
-  const a = document.createElement("a");
-  a.href = dataUrl;
-  a.download =
-    projectType === "cover"
-      ? "gfxlab-cover.png"
-      : "gfxlab-flyer.png";
+  // save current live editor state
+  const oldScaleX = stage.scaleX();
+  const oldScaleY = stage.scaleY();
+  const oldX = stage.x();
+  const oldY = stage.y();
+  const oldDraggable = stage.draggable();
 
-  a.click();
+  try {
+    // reset stage so export is not affected by zoom or pan
+    stage.scale({ x: 1, y: 1 });
+    stage.position({ x: 0, y: 0 });
+    stage.draggable(false);
+    stage.batchDraw();
 
-  setExporting(false);
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+
+    const exportWidth = preset.w;
+    const exportHeight = preset.h;
+
+    // export full stage at exact target size
+    const dataUrl = stage.toDataURL({
+      x: 0,
+      y: 0,
+      width: view.w,
+      height: view.h,
+      pixelRatio: exportWidth / view.w,
+      mimeType: "image/png",
+    });
+
+    // final safety pass: draw into exact output canvas
+    const img = await loadHtmlImage(dataUrl);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = exportWidth;
+    canvas.height = exportHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context not available");
+
+    ctx.clearRect(0, 0, exportWidth, exportHeight);
+    ctx.drawImage(img, 0, 0, exportWidth, exportHeight);
+
+    const finalDataUrl = canvas.toDataURL("image/png");
+
+    const a = document.createElement("a");
+    a.href = finalDataUrl;
+    a.download =
+      projectType === "cover"
+        ? "gfxlab-cover.png"
+        : projectType === "flyer"
+        ? "gfxlab-flyer.png"
+        : "gfxlab-social.png";
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err) {
+    console.error("Export failed:", err);
+    alert("Export failed.");
+  } finally {
+    // restore editor state
+    stage.scale({ x: oldScaleX, y: oldScaleY });
+    stage.position({ x: oldX, y: oldY });
+    stage.draggable(oldDraggable);
+    stage.batchDraw();
+
+    setTimeout(() => {
+      setExporting(false);
+    }, 80);
+  }
+}
+async function saveCurrentDesignForCheckout() {
+  if (typeof window === "undefined") return;
+
+  const payload = {
+    items,
+    bgSrc,
+    projectType,
+    presetId,
+  };
+
+  await savePendingDesign("gfxlab_pending_export_design", payload);
 }
 
-function handleExport() {
-  exportPNG();
+async function saveProject() {
+  try {
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("You must be signed in to save designs.");
+      return;
+    }
+
+    setSaving(true);
+console.log("SAVE USER UID:", user.uid);
+console.log("CURRENT PROJECT ID:", projectId);
+    const payload = {
+      ownerUid: user.uid,
+      name: projectName,
+      projectType,
+      presetId,
+      bgSrc,
+      items,
+      updatedAt: serverTimestamp(),
+    };
+console.log("SAVE PAYLOAD:", payload);
+   const created = await addDoc(collection(db, "projects"), {
+  ...payload,
+  createdAt: serverTimestamp(),
+});
+setProjectId(created.id);
+ } catch (err: any) {
+  console.error("Save project failed:", err);
+  alert(err?.message || "Could not save project.");
+} finally {
+    setSaving(false);
+  }
+}
+
+
+async function handleExport() {
+  if (paid) {
+    exportPNG();
+    return;
+  }
+
+  await saveCurrentDesignForCheckout();
+
+  const guestId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+      : "";
+
+  if (typeof window !== "undefined" && guestId) {
+    localStorage.setItem("gfxlab_guest_id", guestId);
+  }
+
+  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(
+    guestId
+  )}`;
+
 }
 
   async function makeAiBackground() {
@@ -833,66 +1758,82 @@ function deselect(e: any) {
   return (
     <div style={screen}>
       {/* Header */}
-      <div style={header}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button style={iconBtn} onClick={() => window.history.back()} title="Back">
-            ←
-          </button>
-          <img
-            src="/gfxlab-icon.png"
-            alt="GFXlab"
-            style={{ height: 60, width: 60, objectFit: "contain" }}
-          />
-          {paid && (
+   <div style={header}>
+  <style jsx global>{`
+    .sheetBody input,
+    .sheetBody select,
+    .sheetBody textarea {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      display: block;
+    }
+
+    .sheetBody > * {
+      min-width: 0;
+    }
+  `}</style>
+
+  <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+    <button style={iconBtn} onClick={() => window.history.back()} title="Back">
+      ←
+    </button>
+
+    <img
+      src="/gfxlab-icon.png"
+      alt="GFXlab"
+      style={{ height: 40, width: 40, objectFit: "contain", flexShrink: 0 }}
+    />
+  </div>
+
   <div
     style={{
-      background: "#FFD700",
-      color: "#000",
-      padding: "4px 10px",
-      borderRadius: 8,
-      fontWeight: 800,
-      fontSize: 12,
-      marginLeft: 6
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      minWidth: 0,
+      flexShrink: 1,
     }}
   >
-    PRO
+    <select
+      value={projectType}
+      onChange={(e) => setProjectType(e.target.value as ProjectType)}
+      style={miniSelect}
+    >
+      <option value="cover">Cover</option>
+      <option value="flyer">Flyer</option>
+      <option value="social">Social</option>
+    </select>
+
+    {!paid ? (
+      <button
+        onClick={goToProCheckout}
+        style={upgradeBtn}
+        title="Upgrade to Pro"
+      >
+        Upgrade
+      </button>
+    ) : (
+      <div
+        style={{
+          height: 42,
+          padding: "0 12px",
+          borderRadius: 14,
+          background: "#ffffff",
+          color: "black",
+          fontWeight: 800,
+          fontSize: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          whiteSpace: "nowrap",
+        }}
+        title="Pro Member"
+      >
+        PRO
+      </div>
+    )}
   </div>
-)}
-           <style jsx global>{`
-      .sheetBody input,
-      .sheetBody select,
-      .sheetBody textarea {
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-        display: block;
-      }
-
-      .sheetBody > * {
-        min-width: 0;
-      }
-    `}</style>
-
-        </div>
-
-<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-  <select
-    value={projectType}
-    onChange={(e) => setProjectType(e.target.value as ProjectType)}
-    style={miniSelect}
-  >
-    <option value="cover">Cover</option>
-    <option value="flyer">Flyer</option>
-    <option value="social">Social</option>
-  </select>
-
-  <button
-    onClick={goToProCheckout}
-    style={upgradeBtn}
-    title="Upgrade to Pro"
-  >
-    Upgrade
-  </button>
 
   <input
     ref={filePickerRef}
@@ -907,25 +1848,64 @@ function deselect(e: any) {
     }}
   />
 </div>
-      </div>
 
       {/* Canvas */}
       <div style={canvasArea}>
         <div ref={canvasHostRef} style={canvasWrap}>
-          <Stage
-            ref={stageRef as any}
-            width={view.w}
-            height={view.h}
-            onMouseDown={deselect}
-            onTouchStart={deselect}
-          >
+      <Stage
+  ref={stageRef as any}
+  width={view.w}
+  height={view.h}
+  scaleX={stageScale}
+  scaleY={stageScale}
+  x={stagePos.x}
+  y={stagePos.y}
+ draggable={stageScale > 1}  
+  onMouseDown={deselect}
+  onTouchStart={(e) => {
+    const touch1 = e.evt.touches[0];
+    const touch2 = e.evt.touches[1];
+
+    if (touch1 && touch2) {
+      const p1 = { x: touch1.clientX, y: touch1.clientY };
+      const p2 = { x: touch2.clientX, y: touch2.clientY };
+
+      lastDist.current = getDistance(p1, p2);
+      lastCenter.current = getCenter(p1, p2);
+    }
+  }}
+  onTouchMove={(e) => {
+    const touch1 = e.evt.touches[0];
+    const touch2 = e.evt.touches[1];
+
+    if (touch1 && touch2) {
+      const p1 = { x: touch1.clientX, y: touch1.clientY };
+      const p2 = { x: touch2.clientX, y: touch2.clientY };
+
+      const dist = getDistance(p1, p2);
+      const center = getCenter(p1, p2);
+
+      if (!lastDist.current) {
+        lastDist.current = dist;
+        return;
+      }
+
+      const scale = stageScale * (dist / lastDist.current);
+
+      setStageScale(Math.max(0.3, Math.min(scale, 4)));
+
+      lastDist.current = dist;
+      lastCenter.current = center;
+    }
+  }}
+>
             <Layer>
               {bgImg ? (
                 <KImage image={bgImg} x={0} y={0} width={view.w} height={view.h} listening={false} />
               ) : (
                 <Rect x={0} y={0} width={view.w} height={view.h} fill="#000000" listening={false} />
               )}
-             {/* BLEED GUIDE */}
+{/* BLEED GUIDE */}
 {!exporting && (
   <Rect
     x={15}
@@ -934,7 +1914,7 @@ function deselect(e: any) {
     height={view.h - 30}
     stroke="#ff3b3b"
     strokeWidth={2}
-    dash={[8,6]}
+    dash={[8, 6]}
     listening={false}
   />
 )}
@@ -998,15 +1978,19 @@ function deselect(e: any) {
               )}
 
               {/* ✅ FIXED TRANSFORMER JSX (single component, not split) */}
-             <Transformer
-  ref={trRef as any}
-  rotateEnabled
-  enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
-  boundBoxFunc={(oldBox, newBox) => {
-    if (newBox.width < 20 || newBox.height < 20) return oldBox;
-    return newBox;
-  }}
-/>
+           {!exporting && (
+  <Transformer
+    ref={trRef}
+    rotateEnabled
+    enabledAnchors={[
+      "top-left",
+      "top-right",
+      "bottom-left",
+      "bottom-right"
+    ]}
+  />
+)}
+
             </Layer>
           </Stage>
         </div>
@@ -1019,24 +2003,29 @@ function deselect(e: any) {
         <TabBtn label="Adjust" active={tab === "adjust"} onClick={() => setTab(tab === "adjust" ? "none" : "adjust")} />
         <TabBtn label="Layers" active={tab === "layers"} onClick={() => setTab(tab === "layers" ? "none" : "layers")} />
 <ExportButton
-  label="Export $5"
+  label={paid ? "Export" : "Export $5"}
   onExport={handleExport}
-  buttonStyle={{
-    flex: 1,
-    padding: "19px 11px",
-    border: "none",
-    background: "transparent",
-    color: "white",
-    fontWeight: 800,
-    opacity: 0.9,
-    cursor: "pointer",
-  }}
+buttonStyle={{
+  flex: 1,
+  minWidth: 0,
+  height: 46,
+  margin: "0 4px",
+  borderRadius: 11,
+  border: "1px solid rgba(255,255,255,0.22)",
+  background: "rgba(0,0,0,0.22)",
+  color: "white",
+  fontWeight: 900,
+  fontSize: 11,
+  opacity: 1,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+}}
 />
       </div>
 
       {/* Slide-up Panel */}
-      {tab !== "none" && (
-        <div style={sheetWrap}>
+     {tab !== "none" && (
+  <div style={{ ...sheetWrapBase, height: sheetHeight }}>
           <div style={sheet}>
             <div style={sheetHandle} />
             <div style={sheetHeader}>
@@ -1047,82 +2036,179 @@ function deselect(e: any) {
             </div>
 
             <div style={sheetBody} className="sheetBody">
-              {tab === "assets" && (
-                <div>
-                  <div style={{ padding: 12, paddingBottom: 0 }}>
-                    <select value={presetId} onChange={(e) => setPresetId(e.target.value)} style={presetSelect}>
-                      {presets.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+             
+   
+{tab === "assets" && (
+  <div>
+    <div style={{ padding: 12, paddingBottom: 0 }}>
+      <select
+        value={presetId}
+        onChange={(e) => setPresetId(e.target.value)}
+        style={presetSelect}
+      >
+        {presets.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+    </div>
 
-                  <div style={assetsGrid}>
-                    <label style={tileBtn}>
-                      Upload Image
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) addImageFromFile(f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
+    <div style={{ padding: "10px 10px 0" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <button onClick={saveProject} style={btnTile}>
+          {saving ? "Saving..." : "Save Design"}
+        </button>
 
-                    <label style={tileBtn}>
-                      Upload Your Own Background
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) setBackgroundFromFile(f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
+      <button onClick={handleLogout}>
+  Logout
+</button>
+      </div>
+    </div>
 
-                    <button style={tileBtn} onClick={makeAiBackground}>
-                      Create AI Background
-                    </button>
+    <div style={assetsGrid}>
+      <label style={tileBtn}>
+        Upload Image
+        <input
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) addImageFromFile(f);
+            e.currentTarget.value = "";
+          }}
+        />
+      </label>
 
-                    {/* Cutout Photo (same size as others) */}
-<label style={tileBtn}>
-  {cutoutLoading ? "Cutting out..." : "Remove Background From Photo)"}
-  <input
-    type="file"
-    accept="image/*"
-    style={{ display: "none" }}
-    disabled={cutoutLoading}
-    onChange={(e) => {
-      const f = e.target.files?.[0];
-      if (f) cutoutFromFileFreeAI(f);
-      e.currentTarget.value = "";
-    }}
+      <label style={tileBtn}>
+        Upload Your Own Background
+        <input
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) setBackgroundFromFile(f);
+            e.currentTarget.value = "";
+          }}
+        />
+      </label>
+
+      <button style={tileBtn} onClick={makeAiBackground}>
+        Create AI Background
+      </button>
+
+      <label style={tileBtn}>
+        {cutoutLoading ? "Cutting out..." : "Remove Background From Photo"}
+        <input
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          disabled={cutoutLoading}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) cutoutFromFileFreeAI(f);
+            e.currentTarget.value = "";
+          }}
+        />
+      </label>
+    </div>
+
+    <div style={{ padding: "10px" }}>
+      <div style={{ fontWeight: 900, marginBottom: 8 }}>Templates</div>
+
+     <div style={{ padding: "10px" }}>
+  <div style={{ fontWeight: 900, marginBottom: 8 }}>Live Templates</div>
+
+  <TemplateLibrary
+    type={projectType}
+    paid={paid}
+    onPick={loadTemplate}
   />
-</label>
-                  </div>
+</div>
+    </div>
 
-                  <AssetLibrary onPick={addAssetToCanvas} />
-                </div>
-              )}
+    <AssetLibrary onPick={addAssetToCanvas} />
+  </div>
+)}
+             {tab === "text" && (
+  <>
+    <div style={row}>
+  <button style={btnTile} onClick={addText}>
+    + Add Text
+  </button>
+  <button style={btnTile} onClick={duplicateSelected} disabled={!selectedId}>
+    Duplicate
+  </button>
+</div>
 
-              {tab === "text" && (
-                <>
-                  <div style={row}>
-                    <button style={btnTile} onClick={addText}>
-                      + Add Text
-                    </button>
-                    <button style={dangerBtn} onClick={deleteSelected} disabled={!selectedId}>
-                      Delete
-                    </button>
-                  </div>
+<div style={{ padding: "0 12px 12px" }}>
+  <button style={dangerBtn} onClick={deleteSelected} disabled={!selectedId}>
+    Delete
+  </button>
+</div>
+{/* TEXT TEMPLATES */}
+<div style={{ padding: "0 12px 12px" }}>
+  <div style={{ fontWeight: 900, marginBottom: 8 }}>Text Templates</div>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr",
+      gap: 8,
+    }}
+  >
+    <button style={tileBtn} onClick={addArtistTemplate}>
+      Artist + Title
+    </button>
+
+    <button style={tileBtn} onClick={addFlyerTemplate}>
+      Event Flyer
+    </button>
+
+    <button style={tileBtn} onClick={addQuoteTemplate}>
+      Social Quote
+    </button>
+
+    <button style={tileBtn} onClick={addPodcastTemplate}>
+      Podcast Cover
+    </button>
+  </div>
+</div>
+
+<div style={{ padding: "0 12px 12px" }}>
+  <div style={{ fontWeight: 900, marginBottom: 8 }}>Text Effects</div>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8,
+    }}
+  >
+    <button style={templateBtn} onClick={applyGlowText} disabled={!selectedText}>
+      Glow
+    </button>
+
+    <button style={templateBtn} onClick={applyNeonText} disabled={!selectedText}>
+      Neon
+    </button>
+
+    <button style={templateBtn} onClick={applyGoldText} disabled={!selectedText}>
+      Gold
+    </button>
+
+    <button style={templateBtn} onClick={applyHardShadowText} disabled={!selectedText}>
+      Hard Shadow
+    </button>
+
+    <button style={templateBtn} onClick={applyCleanTitleText} disabled={!selectedText}>
+      Clean Title
+    </button>
+  </div>
+</div>
+                  
 
                   {selectedText ? (
                     <FontPanel
@@ -1200,11 +2286,45 @@ function deselect(e: any) {
                     onToFront={() => selectedId && bringToFront(selectedId)}
                     onToBack={() => selectedId && sendToBack(selectedId)}
                   />
-                  <div style={{ padding: 10 }}>
-                    <button style={dangerBtn} onClick={deleteSelected} disabled={!selectedId}>
-                      Delete Selected
-                    </button>
-                  </div>
+
+<div style={{ padding: 10 }}>
+  <div style={{ fontWeight: 900, marginBottom: 8 }}>Align</div>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8,
+      marginBottom: 8,
+    }}
+  >
+    <button style={btnTile} onClick={alignSelectedCenterX} disabled={!selectedId}>
+      Center X
+    </button>
+
+    <button style={btnTile} onClick={alignSelectedCenterY} disabled={!selectedId}>
+      Center Y
+    </button>
+
+    <button style={btnTile} onClick={alignSelectedTop} disabled={!selectedId}>
+      Top
+    </button>
+
+    <button style={btnTile} onClick={alignSelectedBottom} disabled={!selectedId}>
+      Bottom
+    </button>
+  </div>
+</div>
+
+                <div style={{ padding: 10, display: "grid", gap: 8 }}>
+  <button style={btnTile} onClick={duplicateSelected} disabled={!selectedId}>
+    Duplicate Selected
+  </button>
+
+  <button style={dangerBtn} onClick={deleteSelected} disabled={!selectedId}>
+    Delete Selected
+  </button>
+</div>
                 </>
               )}
 
@@ -1238,19 +2358,33 @@ function deselect(e: any) {
 }
 
 /** ---------------- Components ---------------- */
-function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function TabBtn({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
       style={{
         flex: 1,
-        padding: "12px 10px",
-        border: "none",
-        background: "transparent",
-        color: "black",
+        minWidth: 0,
+        height: 30,
+        margin: "0 4px",
+        borderRadius: 12,
+        border: active ? "1px solid rgba(0,0,0,0.15)" : "1px solid transparent",
+        background: active ? "rgba(255,255,255,0.28)" : "transparent",
+        color: active ? "#d1b15a" : "white",
         fontWeight: 900,
-        opacity: active ? 1 : 0.65,
+        fontSize: 13,
+        opacity: active ? 1 : 0.72,
         cursor: "pointer",
+        whiteSpace: "nowrap",
+        transition: "all 0.18s ease",
       }}
     >
       {label}
@@ -1282,6 +2416,41 @@ function CanvasTextItem({
     return () => registerNode(item.id, null);
   }, [item.id, registerNode]);
 
+  useEffect(() => {
+    const group = groupRef.current;
+    const textNode = textRef.current;
+
+    if (!group) return;
+
+    if (item.curveEnabled) {
+      group.offsetX(0);
+      group.offsetY(0);
+      group.getLayer()?.batchDraw();
+      return;
+    }
+
+    if (!textNode) return;
+
+    if (item.align === "center") {
+      group.offsetX(textNode.width() / 2);
+    } else if (item.align === "right") {
+      group.offsetX(textNode.width());
+    } else {
+      group.offsetX(0);
+    }
+
+    group.getLayer()?.batchDraw();
+  }, [
+    item.text,
+    item.fontFamily,
+    item.fontSize,
+    item.fontWeight,
+    item.fontStyle,
+    item.letterSpacing,
+    item.align,
+    item.curveEnabled,
+  ]);
+
   const curveData = arcPath(item.curveRadius, item.curveArc, item.curveReverse);
   const shadowOpacity = item.shadowEnabled ? item.shadowOpacity : 0;
 
@@ -1306,7 +2475,12 @@ function CanvasTextItem({
         const nextFont = Math.max(10, Math.round(item.fontSize * scaleX));
         node.scaleX(1);
         node.scaleY(1);
-        onUpdate(item.id, { fontSize: nextFont, rotation: node.rotation(), x: node.x(), y: node.y() });
+        onUpdate(item.id, {
+          fontSize: nextFont,
+          rotation: node.rotation(),
+          x: node.x(),
+          y: node.y(),
+        });
       }}
     >
       {item.curveEnabled ? (
@@ -1377,6 +2551,8 @@ function CanvasImageItem({
     registerNode(item.id, nodeRef.current);
     return () => registerNode(item.id, null);
   }, [item.id, registerNode]);
+
+ 
 
   useEffect(() => {
     let cancelled = false;
@@ -1469,13 +2645,14 @@ const screen: React.CSSProperties = {
 };
 
 const header: React.CSSProperties = {
-  height: 56,
-  padding: "0 12px",
+  height: 64,
+  padding: "0 10px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  borderBottom: "1px solid rgba(255,255,255,0.2)",
-  background: "rgb(0, 0, 0)",
+  gap: 8,
+  borderBottom: "1px solid rgba(255,255,255,0.14)",
+  background: "rgba(0, 0, 0, 0.92)",
   position: "sticky",
   top: 0,
   zIndex: 10,
@@ -1483,73 +2660,85 @@ const header: React.CSSProperties = {
 };
 
 const iconBtn: React.CSSProperties = {
-  width: 38,
-  height: 38,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.2)",
+  width: 42,
+  height: 42,
+  minWidth: 42,
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.14)",
   background: "rgb(209, 177, 90)",
   color: "black",
   cursor: "pointer",
   fontWeight: 900,
+  fontSize: 18,
 };
-
 const miniSelect: React.CSSProperties = {
-  height: 38,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.2)",
+  height: 42,
+  minWidth: 96,
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.14)",
   background: "rgb(209, 177, 90)",
   color: "black",
-  padding: "0 10px",
+  padding: "0 12px",
   outline: "none",
   fontWeight: 800,
+  fontSize: 16,
 };
 const upgradeBtn: React.CSSProperties = {
-  height: 38,
+  height: 42,
   padding: "0 14px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.2)",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.14)",
   background: "#ffffff",
-  color: "#000000",
-  fontWeight: 900,
+  color: "black",
+  fontWeight: 800,
+  fontSize: 14,
   cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 const canvasArea: React.CSSProperties = {
-  height: "calc(100vh - 56px - 54px)",
-  padding: "10px 12px",
+  height: "calc(100vh - 64px - 58px)",
+  padding: "8px 10px 6px",
   display: "flex",
   justifyContent: "center",
   alignItems: "flex-start",
   overflow: "hidden",
 };
-
 const canvasWrap: React.CSSProperties = {
-  marginTop: 6,
-  borderRadius: 18,
-  overflow: "hidden",
-  border: "1px solid rgba(255,255,255,0.2)",
-  background: "#000000",
-  boxShadow: "0 12px 30px rgba(0,0,0,0.4)",
-};
-
-const tabBar: React.CSSProperties = {
-  height: 54,
+  width: "100%",
+  height: "100%",
   display: "flex",
-  borderTop: "1px solid rgba(255,255,255,0.2)",
-  background: "#d1b15a",
+  justifyContent: "center",
+  alignItems: "flex-start",
+  paddingTop: 6,
+  borderRadius: 24,
+  overflow: "visible",
+  border: "1px solid rgba(255,255,255,0.14)",
+  background: "#00000065",
+  boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
+};
+const tabBar: React.CSSProperties = {
+  height: 64,
+  display: "flex",
+  alignItems: "center",
+  padding: "0 8px",
+  borderTop: "1px solid rgba(255,255,255,0.08)",
+  backgroundImage: "url('/gold-texture.jpg')",
+  backgroundSize: "cover",
+  backgroundBlendMode: "overlay",
+backgroundColor: "rgba(0,0,0,0.65)",
+  backgroundPosition: "center",
   position: "fixed",
   left: 0,
   right: 0,
   bottom: 0,
   zIndex: 20,
-  backdropFilter: "blur(10px)",
+  boxShadow: "0 -6px 20px rgba(0,0,0,0.35)",
 };
-
-const sheetWrap: React.CSSProperties = {
+const sheetWrapBase: React.CSSProperties = {
   position: "fixed",
   left: 0,
   right: 0,
-  bottom: 54,
-  height: "min(320px, 35vh)",   // ✅ gives a real height so scroll can work
+  bottom: 58,
   zIndex: 30,
   display: "grid",
   placeItems: "end center",
@@ -1558,22 +2747,25 @@ const sheetWrap: React.CSSProperties = {
 
 const sheet: React.CSSProperties = {
   pointerEvents: "auto",
-  width: "min(980px, 95%)",
-  height: "100%",               // ✅ now 100% works (parent has height)
-  background: "rgba(0, 0, 0, 0.84)",
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  border: "1px solid rgba(0, 0, 0, 0.44)",
+  width: "min(980px, 90%)",
+  height: "100%",
+  background: "rgba(0, 0, 0, 0.88)",
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  border: "1px solid #d1b15a",
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
 };
 
 const sheetBody: React.CSSProperties = {
-  padding: 12,
+  padding: 8,
   width: "100%",
   boxSizing: "border-box",
   overflowX: "hidden",
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  flex: 1,
 };
 const inputFull: React.CSSProperties = {
   width: "100%",
@@ -1581,19 +2773,19 @@ const inputFull: React.CSSProperties = {
   boxSizing: "border-box",
 };
 const sheetHandle: React.CSSProperties = {
-  width: 46,
+  width: 54,
   height: 5,
   borderRadius: 999,
   background: "rgb(209, 177, 90)",
-  margin: "10px auto 6px",
+  margin: "8px auto 4px",
 };
 
 const sheetHeader: React.CSSProperties = {
-  padding: "10px 12px",
+  padding: "8px 12px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  borderBottom: "1px solid rgba(255,255,255,0.2)",
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
 
 const row: React.CSSProperties = {
@@ -1636,48 +2828,69 @@ const dangerBtn: React.CSSProperties = {
 
 const assetsGrid: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 12,
-  padding: 12,
+  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+  gap: 8,
+  padding: "6px 10px",
   alignItems: "stretch",
 };
 
 const tileBtn: React.CSSProperties = {
   width: "100%",
-  height: 64,                 // 👈 same height
-  borderRadius: 16,
+  minWidth: 0,
+  height: 46,
+  padding: "4px 6px",
+  borderRadius: 12,
   border: "1px solid rgba(255,255,255,0.18)",
- backgroundImage: "linear-gradient(135deg, #d1b15a, #000000)",
- 
+  backgroundImage: "linear-gradient(135deg,#d1b15a,#000000)",
   color: "white",
-  fontWeight: 800,
-  fontSize: 14,
+  fontWeight: 700,
+  fontSize: 11,
+  lineHeight: 1.1,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   textAlign: "center",
   cursor: "pointer",
+  boxSizing: "border-box",
 };
 const tileBtnWide: React.CSSProperties = {
   ...tileBtn,
   gridColumn: "1 / -1",
-  height: 64,
+  height: 50,
 };
 const presetSelect: React.CSSProperties = {
   width: "100%",
-  height: 46,
+  height: 52,
   borderRadius: 16,
-  border: "1px solid rgba(255,255,255,0.25)",
+  border: "1px solid rgba(255,255,255,0.18)",
   background: "rgba(0,0,0,0.55)",
   color: "white",
   padding: "0 14px",
   fontWeight: 900,
+  fontSize: 14,
   outline: "none",
 };
 const FONT_OPTIONS = [
   { label: "Arial", value: "Arial" },
   { label: "Bebas Neue", value: "BebasNeue" },
 ];
+const templateBtn: React.CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  padding: "8px 10px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.18)",
+  backgroundImage: "linear-gradient(135deg, #d1b15a, #000000)",
+  color: "white",
+  fontWeight: 800,
+  fontSize: 12,
+  lineHeight: 1.1,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  cursor: "pointer",
+};
 
 const checkRow: React.CSSProperties = { display: "flex", gap: 8, alignItems: "center" };
 const hint: React.CSSProperties = { padding: 12, fontSize: 12, opacity: 0.75 };

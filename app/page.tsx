@@ -1,279 +1,366 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { getAuth } from "firebase/auth";
+import { app } from "@/lib/firebase";
 
-const GOLD = "#C8A24A";
-const GOLD_SOFT = "rgba(200,162,74,0.25)";
-const BG_OVERLAY = "rgba(0,0,0,0.78)";
-const CARD = "rgba(10,10,10,0.72)";
-const BORDER = "rgba(255,255,255,0.14)";
-const TEXT_DIM = "rgba(255,255,255,0.72)";
-
-export default function Page() {
+export default function Home() {
   const router = useRouter();
 
-  function handleGuestContinue() {
-    router.push("/editor");
+  const [loadingGuest, setLoadingGuest] = useState(false);
+  const [loadingPro, setLoadingPro] = useState(false);
+
+  async function handleGuest() {
+    if (loadingGuest) return;
+
+    try {
+      setLoadingGuest(true);
+      router.push("/editor");
+    } catch (err) {
+      console.error(err);
+      setLoadingGuest(false);
+    }
   }
 
-  function handleProUpgrade() {
-    router.push("/login?next=checkout-pro");
+  async function handleProCheckout() {
+    if (loadingPro) return;
+
+    try {
+      setLoadingPro(true);
+
+      const auth = getAuth(app);
+      let user = auth.currentUser;
+
+      if (!user) {
+        await new Promise<void>((resolve) => {
+          const unsub = auth.onAuthStateChanged((u) => {
+            user = u;
+            unsub();
+            resolve();
+          });
+        });
+      }
+
+      if (!user) {
+        router.push("/login");
+        setLoadingPro(false);
+        return;
+      }
+
+      const params = new URLSearchParams();
+      params.set("uid", user.uid);
+      if (user.email) {
+        params.set("email", user.email);
+      }
+
+      window.location.href = `/api/stripe/checkout-pro?${params.toString()}`;
+    } catch (err) {
+      console.error(err);
+      alert("Stripe checkout failed.");
+      setLoadingPro(false);
+    }
   }
 
-  function handleSignIn() {
+  function handleAlreadyPro() {
     router.push("/login");
   }
 
   return (
-    <div
+    <main
       style={{
         minHeight: "100vh",
-        backgroundImage: "url('/background.jpg')",
+        backgroundImage: "url('/app-bg.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
+        display: "flex",
+        justifyContent: "center",
+        padding: "0px 40px 18px",
+        color: "white",
       }}
     >
       <div
         style={{
-          minHeight: "100vh",
-          background: BG_OVERLAY,
+          width: "100%",
+          maxWidth: 340,
           display: "flex",
-          justifyContent: "center",
-          padding: 18,
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
         }}
       >
+        <img
+          src="/logo.png"
+          alt="GfxLab"
+          style={{
+            width: "100%",
+            maxWidth: 235,
+            height: "auto",
+            objectFit: "contain",
+            marginTop: -10,
+          }}
+        />
+
+        <div style={{ textAlign: "center", marginTop: 2 }}>
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 500,
+              lineHeight: 1.2,
+            }}
+          >
+            Create graphics fast. Export when you're ready.
+          </div>
+
+          <div
+            style={{
+              fontSize: 12,
+              opacity: 0.72,
+              marginTop: 10,
+            }}
+          >
+            Guest exports are $5 each • Pro is unlimited
+          </div>
+        </div>
+
         <div
           style={{
             width: "100%",
-            maxWidth: 980,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
+            background: "rgba(0,0,0,0.82)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 22,
+            padding: "15px 15px 13px",
+            boxShadow: "0 10px 26px rgba(0,0,0,0.30)",
+            backdropFilter: "blur(8px)",
           }}
         >
-          {/* Header */}
           <div
             style={{
-              textAlign: "center",
+              fontSize: 13,
+              opacity: 0.9,
+              marginBottom: 8,
+            }}
+          >
+            Pay Per Export
+          </div>
+
+          <div
+            style={{
               display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              marginTop: -30,
-              marginBottom: 18,
+              alignItems: "flex-end",
+              gap: 8,
+              marginBottom: 12,
             }}
           >
-            <img
-              src="/logo.png"
-              alt="GfxLab"
+            <span
               style={{
-                width: 300,
-                maxWidth: "80vw",
-                height: "auto",
-                marginBottom: -28,
-                filter: "drop-shadow(0 0 14px rgba(200,162,74,0.55))",
-              }}
-            />
-
-            <div
-              style={{
-                color: TEXT_DIM,
-                fontSize: 15,
-                marginTop: 0,
-                textAlign: "center",
+                fontSize: 54,
+                fontWeight: 900,
+                lineHeight: 0.9,
+                letterSpacing: "-2px",
               }}
             >
-              Create graphics fast. Export when you're ready.
-            </div>
+              $5
+            </span>
 
-            <div
+            <span
               style={{
-                color: "rgba(255,255,255,0.55)",
-                fontSize: 12,
-                marginTop: 6,
-                textAlign: "center",
+                fontSize: 16,
+                opacity: 0.9,
+                marginBottom: 7,
               }}
             >
-              Guest exports are $5 each • Pro is unlimited
-            </div>
+              per export
+            </span>
           </div>
 
-          {/* Pricing cards */}
           <div
-            className="pricingGrid"
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: 14,
-              alignItems: "stretch",
+              fontSize: 15,
+              lineHeight: 1.22,
+              opacity: 0.95,
+              maxWidth: 280,
+              marginBottom: 14,
             }}
           >
-            {/* Guest card */}
-            <div
-              style={{
-                background: CARD,
-                border: `1px solid ${BORDER}`,
-                borderRadius: 16,
-                padding: 18,
-                boxShadow: "0 10px 34px rgba(0,0,0,0.40)",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              <div style={{ fontSize: 14, color: TEXT_DIM }}>
-                Pay Per Export
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 10,
-                  marginTop: 10,
-                }}
-              >
-                <div style={{ fontSize: 46, fontWeight: 900 }}>$5</div>
-                <div style={{ color: TEXT_DIM }}>per export</div>
-              </div>
-
-              <div style={{ marginTop: 10, color: TEXT_DIM }}>
-                Export your design anytime. No account needed.
-              </div>
-
-              <button
-                onClick={handleGuestContinue}
-                style={{
-                  marginTop: 16,
-                  width: "100%",
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  background: "transparent",
-                  color: "white",
-                  border: `1px solid ${BORDER}`,
-                  cursor: "pointer",
-                  fontSize: 16,
-                  fontWeight: 800,
-                }}
-              >
-                Continue as Guest
-              </button>
-
-              <div style={{ marginTop: 10, fontSize: 12, color: TEXT_DIM }}>
-                Tip: If you export a lot, Pro saves money fast.
-              </div>
-            </div>
-
-            {/* Pro card */}
-            <div
-              style={{
-                background: `linear-gradient(180deg, ${GOLD_SOFT}, rgba(0,0,0,0))`,
-                border: `1px solid ${GOLD}`,
-                borderRadius: 16,
-                padding: 18,
-                boxShadow: "0 12px 44px rgba(200,162,74,0.14)",
-                position: "relative",
-                overflow: "hidden",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 12,
-                  right: 12,
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  background: GOLD,
-                  color: "black",
-                  fontSize: 12,
-                  fontWeight: 900,
-                }}
-              >
-                BEST VALUE
-              </div>
-
-              <div style={{ fontSize: 14, color: TEXT_DIM }}>GfxLab Pro</div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 10,
-                  marginTop: 10,
-                }}
-              >
-                <div style={{ fontSize: 46, fontWeight: 950 }}>$50</div>
-                <div style={{ color: TEXT_DIM }}>/ month</div>
-              </div>
-
-              <div style={{ marginTop: 10, color: TEXT_DIM }}>
-                Unlimited exports + premium features.
-              </div>
-
-              <ul
-                style={{
-                  marginTop: 14,
-                  marginBottom: 0,
-                  paddingLeft: 18,
-                  color: "white",
-                  lineHeight: 1.55,
-                }}
-              >
-                <li style={{ marginBottom: 6 }}>Unlimited exports</li>
-                <li style={{ marginBottom: 6 }}>High resolution</li>
-                <li style={{ marginBottom: 6 }}>Transparent PNG</li>
-                <li style={{ marginBottom: 0 }}>Premium assets + fonts</li>
-              </ul>
-
-              <div style={{ marginTop: 10, fontSize: 12, color: TEXT_DIM }}>
-                Break-even: 10 exports/month = $50
-              </div>
-
-              <button
-                onClick={handleProUpgrade}
-                style={{
-                  marginTop: 16,
-                  width: "100%",
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  background: GOLD,
-                  color: "black",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  fontWeight: 950,
-                }}
-              >
-                Upgrade to Pro
-              </button>
-            </div>
+            Export your design anytime. No account needed.
           </div>
 
-          {/* Footer */}
-          <div style={{ textAlign: "center", marginTop: 18 }}>
-            <button
-              onClick={handleSignIn}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "rgba(255,255,255,0.70)",
-                cursor: "pointer",
-                textDecoration: "underline",
-                fontSize: 14,
-              }}
-            >
-              Already Pro? Sign In
-            </button>
-          </div>
+          <button
+            onClick={handleGuest}
+            disabled={loadingGuest}
+            style={{
+              width: "100%",
+              height: 30,
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgb(0, 0, 0)",
+              color: "white",
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: "pointer",
+              opacity: loadingGuest ? 0.7 : 1,
+            }}
+          >
+            {loadingGuest ? "Opening..." : "Continue as Guest"}
+          </button>
 
-          <style jsx>{`
-            @media (min-width: 760px) {
-              .pricingGrid {
-                grid-template-columns: 1fr 1fr !important;
-              }
-            }
-          `}</style>
+          <div
+            style={{
+              fontSize: 12,
+              opacity: 0.68,
+              marginTop: 12,
+            }}
+          >
+            Tip: If you export a lot, Pro saves money fast.
+          </div>
         </div>
+
+        <div
+          style={{
+            width: "100%",
+            background:
+              "linear-gradient(180deg, rgba(209,177,90,0.34) 0%, rgba(0,0,0,0.82) 62%)",
+            border: "1px solid rgba(209,177,90,0.65)",
+            borderRadius: 22,
+            padding: "15px 15px 7px",
+            boxShadow: "0 10px 26px rgba(0,0,0,0.32)",
+            position: "relative",
+            overflow: "hidden",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 14,
+              right: 14,
+              background: "#e0bb58",
+              color: "black",
+              fontSize: 11,
+              fontWeight: 900,
+              borderRadius: 999,
+              padding: "7px 11px",
+            }}
+          >
+            BEST VALUE
+          </div>
+
+          <div
+            style={{
+              fontSize: 13,
+              opacity: 0.95,
+              marginBottom: 8,
+            }}
+          >
+            GfxLab Pro
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              gap: 5,
+              marginBottom: 10,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 52,
+                fontWeight: 900,
+                lineHeight: 0.9,
+                letterSpacing: "-2px",
+              }}
+            >
+              $50
+            </span>
+
+            <span
+              style={{
+                fontSize: 16,
+                opacity: 0.9,
+                marginBottom: 7,
+              }}
+            >
+              / month
+            </span>
+          </div>
+
+          <div
+            style={{
+              fontSize: 15,
+              lineHeight: 1.25,
+              opacity: 0.96,
+              marginBottom: 12,
+            }}
+          >
+            Unlimited exports + premium features.
+          </div>
+
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 22,
+              lineHeight: 1.7,
+              fontSize: 15,
+              marginBottom: 10,
+            }}
+          >
+            <li>Unlimited exports</li>
+            <li>High resolution</li>
+            <li>Transparent PNG</li>
+            <li>Premium assets + fonts</li>
+          </ul>
+
+          <div
+            style={{
+              fontSize: 12,
+              opacity: 0.74,
+              marginBottom: 12,
+            }}
+          >
+            Break-even: 10 exports/month = $50
+          </div>
+
+          <button
+            onClick={handleProCheckout}
+            disabled={loadingPro}
+            style={{
+              width: "100%",
+              height: 30,
+              borderRadius: 14,
+              border: "none",
+              background: "#d1b15a",
+              color: "black",
+              fontWeight: 900,
+              fontSize: 15,
+              cursor: "pointer",
+              opacity: loadingPro ? 0.7 : 1,
+            }}
+          >
+            {loadingPro ? "Loading..." : "Upgrade to Pro"}
+          </button>
+        </div>
+
+        <button
+          onClick={handleAlreadyPro}
+          style={{
+            width: "100%",
+            maxWidth: 370,
+            height: 42,
+            borderRadius: 14,
+            border: "1px solid rgba(255,255,255,0.14)",
+            background: "rgba(0,0,0,0.45)",
+            color: "white",
+            fontWeight: 800,
+            fontSize: 14,
+            cursor: "pointer",
+          }}
+        >
+          Already Pro? Sign In
+        </button>
       </div>
-    </div>
+    </main>
   );
 }

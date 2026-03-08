@@ -21,7 +21,11 @@ function makeAssetUrl(path: string) {
   )}?alt=media`;
 }
 
-export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) => void }) {
+export default function AssetLibrary({
+  onPick,
+}: {
+  onPick: (asset: AssetItem) => void;
+}) {
   const [type, setType] = useState<AssetType>("background");
   const [assets, setAssets] = useState<FireAsset[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,12 +35,16 @@ export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) =>
     setLoading(true);
 
     fetchAssets(type)
-      .then((rows) => alive && setAssets(rows))
+      .then((rows) => {
+        if (alive) setAssets(rows);
+      })
       .catch((err) => {
         console.error("fetchAssets failed", err);
-        alive && setAssets([]);
+        if (alive) setAssets([]);
       })
-      .finally(() => alive && setLoading(false));
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
 
     return () => {
       alive = false;
@@ -44,7 +52,16 @@ export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) =>
   }, [type]);
 
   function pickAsset(a: FireAsset) {
-    onPick({ src: makeAssetUrl(a.path), name: a.name, type: a.type });
+    if (!a.path) {
+      alert("That asset is missing a file path.");
+      return;
+    }
+
+    onPick({
+      src: makeAssetUrl(a.path),
+      name: a.name,
+      type: a.type,
+    });
   }
 
   return (
@@ -71,35 +88,67 @@ export default function AssetLibrary({ onPick }: { onPick: (asset: AssetItem) =>
 
       {loading && <div style={{ opacity: 0.8 }}>Loading…</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          padding: "10px 4px",
+        }}
+      >
         {assets.map((a) => (
           <button
             key={a.id}
+            type="button"
             onClick={() => pickAsset(a)}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              pickAsset(a);
+            }}
+            title={a.name || "asset"}
             style={{
               borderRadius: 14,
               overflow: "hidden",
               border: "1px solid rgba(255,255,255,0.18)",
-              background: "rgba(0,0,0,0.25)",
-              padding: 10,
-              cursor: "pointer",
-              height: 120,
+              background: "linear-gradient(135deg,#d1b15a,#000000)",
+              color: "white",
+              fontWeight: 700,
+              fontSize: 14,
+              height: 110,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              textAlign: "center",
+              padding: "10px",
+              cursor: "pointer",
+              touchAction: "manipulation",
             }}
-            title={a.name || "asset"}
           >
-            <img
-              src={makeAssetUrl(a.path)}
-              alt={a.name || "asset"}
-              style={{
-                maxWidth: "100%",
-                maxHeight: "100%",
-                objectFit: "contain",
-                display: "block",
-              }}
-            />
+            {a.path ? (
+              <img
+                src={makeAssetUrl(a.path)}
+                alt={a.name || "asset"}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                  pointerEvents: "none",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  color: "white",
+                  fontSize: 12,
+                  opacity: 0.7,
+                  textAlign: "center",
+                  padding: 12,
+                }}
+              >
+                Missing asset image
+              </div>
+            )}
           </button>
         ))}
       </div>
