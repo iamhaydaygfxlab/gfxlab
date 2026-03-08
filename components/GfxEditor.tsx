@@ -384,7 +384,7 @@ export default function GfxEditor() {
       ? "min(200px, 24vh)"
       : "min(220px, 24vh)";
 
-  const panelReserve = tab === "none" ? 18 : isMobile ? 240 : 170;
+  const panelReserve = tab === "none" ? 18 : isMobile ? 170 : 150;
   const workspacePadding = isMobile ? 16 : 26;
   const artboardPadding = isMobile ? 26 : 40;
 
@@ -2255,13 +2255,13 @@ const proPill: React.CSSProperties = {
 
 const canvasArea: React.CSSProperties = {
   height: "calc(100vh - 64px - 58px)",
-  padding: "8px 10px 10px",
+  padding: "0px 10px 0px",
+  paddingTop: "4px",
   display: "flex",
   justifyContent: "center",
-  alignItems: "center",
+  alignItems: "flex-start",
   overflow: "hidden",
 };
-
 const canvasWrap: React.CSSProperties = {
   width: "100%",
   height: "100%",
