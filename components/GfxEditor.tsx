@@ -344,11 +344,12 @@ export default function GfxEditor() {
 
 async function handleLogout() {
   try {
-    const auth = getAuth();
+    const auth = getAuth(app);
     await signOut(auth);
-    router.replace("/");
+    window.location.href = "/";
   } catch (err) {
-    console.error("Logout failed", err);
+    console.error("Logout failed:", err);
+    alert("Could not log out.");
   }
 }
 
