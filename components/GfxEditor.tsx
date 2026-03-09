@@ -1597,7 +1597,15 @@ function applyHaydayEffect() {
             </Layer>
 
             <Layer>
-              <Group ref={artGroupRef as any} x={view.x} y={view.y}>
+              <Group
+  ref={artGroupRef as any}
+  x={view.x}
+  y={view.y}
+  clipX={0}
+  clipY={0}
+  clipWidth={view.w}
+  clipHeight={view.h}
+>
                 {bgImg ? (
                   <KImage image={bgImg} x={0} y={0} width={view.w} height={view.h} listening={false} />
                 ) : (
@@ -1617,16 +1625,18 @@ function applyHaydayEffect() {
                       registerNode={registerNode}
                     />
                   ) : (
-                    <CanvasImageItem
-                      key={it.id}
-                      item={it}
-                      ratio={view.ratio}
-                      onSelect={setSelectedId}
-                      onUpdate={updateItem}
-                      onDragMove={(node) => applySnapping(node)}
-                      onDragEnd={clearGuides}
-                      registerNode={registerNode}
-                    />
+             <CanvasImageItem
+  key={it.id}
+  item={it}
+  ratio={view.ratio}
+  canvasW={view.w}
+  canvasH={view.h}
+  onSelect={setSelectedId}
+  onUpdate={updateItem}
+  onDragMove={(node) => applySnapping(node)}
+  onDragEnd={clearGuides}
+  registerNode={registerNode}
+/>
                   )
                 )}
 
@@ -2167,6 +2177,8 @@ function CanvasTextItem({
 function CanvasImageItem({
   item,
   ratio,
+  canvasW,
+  canvasH,
   onSelect,
   onUpdate,
   onDragMove,
@@ -2175,6 +2187,8 @@ function CanvasImageItem({
 }: {
   item: ImageItem;
   ratio: number;
+  canvasW: number;
+  canvasH: number;
   onSelect: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Item>) => void;
   onDragMove: (node: Konva.Node | null) => void;
@@ -2284,25 +2298,30 @@ finalNoise += sharpen * 0.04;
 }, [img, item.adj, item.width, item.height]);
 
   return (
-    <KImage
-      ref={nodeRef as any}
-      id={item.id}
-      image={img ?? undefined}
-      x={item.x * ratio}
-      y={item.y * ratio}
-      rotation={item.rotation}
-      width={item.width * ratio}
-      height={item.height * ratio}
-      scaleX={item.scale ?? 1}
-scaleY={item.scale ?? 1}
-      draggable
-      onClick={() => onSelect(item.id)}
-      onTap={() => onSelect(item.id)}
-      onDragMove={(e) => onDragMove(e.target)}
-      onDragEnd={(e) => {
-        onUpdate(item.id, { x: e.target.x() / ratio, y: e.target.y() / ratio });
-        onDragEnd();
-      }}
+<KImage
+  ref={nodeRef as any}
+  id={item.id}
+  image={img ?? undefined}
+  x={item.x * ratio}
+  y={item.y * ratio}
+  rotation={item.rotation}
+  width={item.width * ratio}
+  height={item.height * ratio}
+  scaleX={item.scale ?? 1}
+  scaleY={item.scale ?? 1}
+  draggable
+dragBoundFunc={(pos) => {
+  const scaledW = item.width * ratio * (item.scale ?? 1);
+  const scaledH = item.height * ratio * (item.scale ?? 1);
+
+  const maxX = Math.max(0, canvasW - scaledW);
+  const maxY = Math.max(0, canvasH - scaledH);
+
+  return {
+    x: Math.min(Math.max(pos.x, 0), maxX),
+    y: Math.min(Math.max(pos.y, 0), maxY),
+  };
+}}
   onTransformEnd={(e) => {
   const node = e.target as Konva.Image;
   const scaleX = node.scaleX();
