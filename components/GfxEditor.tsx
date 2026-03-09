@@ -2310,18 +2310,7 @@ finalNoise += sharpen * 0.04;
   scaleX={item.scale ?? 1}
   scaleY={item.scale ?? 1}
   draggable
-dragBoundFunc={(pos) => {
-  const scaledW = item.width * ratio * (item.scale ?? 1);
-  const scaledH = item.height * ratio * (item.scale ?? 1);
 
-  const minX = canvasW - scaledW;
-  const minY = canvasH - scaledH;
-
-  return {
-    x: Math.min(0, Math.max(pos.x, minX)),
-    y: Math.min(0, Math.max(pos.y, minY)),
-  };
-}}
   onTransformEnd={(e) => {
   const node = e.target as Konva.Image;
   const scaleX = node.scaleX();
