@@ -92,6 +92,7 @@ type ImageItem = {
   src: string;
   width: number;
   height: number;
+  scale: number;
   adj: ImageAdjustments;
 };
 
@@ -125,6 +126,8 @@ export function loadHtmlImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+
+
 function defaultAdj(): ImageAdjustments {
   return {
     brightness: 0,
@@ -135,6 +138,18 @@ function defaultAdj(): ImageAdjustments {
     hdr: 0,
     texture: 0,
     clarity: 0,
+
+    exposure: 0,
+    sharpen: 0,
+    vignette: 0,
+    grain: 0,
+    warmth: 0,
+    highlights: 0,
+    shadows: 0,
+    fade: 0,
+    denoise: 0,
+
+    curvePreset: "none",
   };
 }
 
@@ -147,7 +162,7 @@ function defaultText(): TextItem {
     rotation: 0,
     text: "Create",
     fontFamily: "Impact",
-    fontSize: 60,
+    fontSize: 80,
     fontWeight: 800,
     fontStyle: "normal",
     fill: "#ff0000",
@@ -384,7 +399,14 @@ export default function GfxEditor() {
       ? "min(200px, 24vh)"
       : "min(220px, 24vh)";
 
-  const panelReserve = tab === "none" ? 18 : isMobile ? 170 : 150;
+  const panelReserve =
+  tab !== "none"
+    ? isMobile
+      ? 220
+      : 150
+    : isMobile
+    ? 24
+    : 0;
   const workspacePadding = isMobile ? 16 : 26;
   const artboardPadding = isMobile ? 26 : 40;
 
@@ -396,7 +418,7 @@ export default function GfxEditor() {
     const w = Math.max(120, Math.round(preset.w * scaledRatio));
     const h = Math.max(120, Math.round(preset.h * scaledRatio));
     const x = Math.round((hostSize.w - w) / 2);
-    const y = Math.max(workspacePadding, Math.round((hostSize.h - panelReserve - h) / 2));
+   const y = workspacePadding + 10;
     return { w, h, ratio: scaledRatio, x, y };
   }, [hostSize, panelReserve, preset, workspacePadding, artboardPadding]);
 
@@ -675,17 +697,18 @@ export default function GfxEditor() {
       const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
       const w = Math.max(60, Math.round(img.width * ratio));
       const h = Math.max(60, Math.round(img.height * ratio));
-      const imgItem: ImageItem = {
-        id: uid(),
-        kind: "image",
-        x: Math.round((preset.w - w) / 2),
-        y: Math.round((preset.h - h) / 2),
-        rotation: 0,
-        src: safeSrc,
-        width: w,
-        height: h,
-        adj: defaultAdj(),
-      };
+     const imgItem: ImageItem = {
+  id: uid(),
+  kind: "image",
+  x: Math.round((preset.w - w) / 2),
+  y: Math.round((preset.h - h) / 2),
+  rotation: 0,
+  src: safeSrc,
+  width: w,
+  height: h,
+  scale: 1,
+  adj: defaultAdj(),
+};
       setItems((prev) => [...prev, imgItem]);
       setSelectedId(imgItem.id);
       setTab("adjust");
@@ -707,16 +730,17 @@ export default function GfxEditor() {
         const w = Math.max(60, Math.round(img.width * ratio));
         const h = Math.max(60, Math.round(img.height * ratio));
         const imgItem: ImageItem = {
-          id: uid(),
-          kind: "image",
-          x: Math.round((preset.w - w) / 2),
-          y: Math.round((preset.h - h) / 2),
-          rotation: 0,
-          src,
-          width: w,
-          height: h,
-          adj: defaultAdj(),
-        };
+  id: uid(),
+  kind: "image",
+  x: Math.round((preset.w - w) / 2),
+  y: Math.round((preset.h - h) / 2),
+  rotation: 0,
+  src,
+  width: w,
+  height: h,
+  scale: 1,
+  adj: defaultAdj(),
+};
         setItems((prev) => [...prev, imgItem]);
         setSelectedId(imgItem.id);
         setTab("adjust");
@@ -744,17 +768,18 @@ export default function GfxEditor() {
       const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
       const w = Math.max(60, Math.round(img.width * ratio));
       const h = Math.max(60, Math.round(img.height * ratio));
-      const imgItem: ImageItem = {
-        id: uid(),
-        kind: "image",
-        x: Math.round((preset.w - w) / 2),
-        y: Math.round((preset.h - h) / 2),
-        rotation: 0,
-        src: pngDataUrl,
-        width: w,
-        height: h,
-        adj: defaultAdj(),
-      };
+     const imgItem: ImageItem = {
+  id: uid(),
+  kind: "image",
+  x: Math.round((preset.w - w) / 2),
+  y: Math.round((preset.h - h) / 2),
+  rotation: 0,
+  src: pngDataUrl,
+  width: w,
+  height: h,
+  scale: 1,
+  adj: defaultAdj(),
+};
       setItems((prev) => [...prev, imgItem]);
       setSelectedId(imgItem.id);
       setTab("adjust");
@@ -1436,7 +1461,33 @@ export default function GfxEditor() {
       style3d: "none",
     });
   }
+function applyHaydayEffect() {
+  if (!selectedImage) return;
 
+  updateItem(selectedImage.id, {
+    adj: {
+      ...selectedImage.adj,
+      brightness: -0.10,
+      exposure: 0.12,
+      contrast: -51,
+      saturation: -1.05,
+      hue: 0,
+      blur: 0,
+      hdr: 0.28,
+      texture: 0.39,
+      clarity: 0.89,
+      sharpen: 0.62,
+      vignette: 0,
+      grain: 0.12,
+      warmth: -0.1,
+      highlights: -0.4,
+      shadows: 0.15,
+      fade: 0.10,
+      denoise: 0.47,
+      curvePreset: "medium-contrast",
+    },
+  } as Partial<Item>);
+}
   return (
     <div style={screen}>
       <div style={header}>
@@ -1627,17 +1678,22 @@ export default function GfxEditor() {
               )}
 
               {!exporting && (
-                <Transformer
-                  ref={trRef}
-                  padding={24}
-                  rotateEnabled
-                  ignoreStroke
-                  enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
-                  boundBoxFunc={(oldBox, newBox) => {
-                    if (newBox.width < 20 || newBox.height < 20) return oldBox;
-                    return newBox;
-                  }}
-                />
+            <Transformer
+  ref={trRef}
+  rotateEnabled
+  enabledAnchors={[
+    "top-left",
+    "top-right",
+    "bottom-left",
+    "bottom-right"
+  ]}
+  boundBoxFunc={(oldBox, newBox) => {
+    if (newBox.width < 40 || newBox.height < 40) {
+      return oldBox;
+    }
+    return newBox;
+  }}
+/>
               )}
             </Layer>
           </Stage>
@@ -1858,11 +1914,47 @@ export default function GfxEditor() {
                     </label>
                     <div style={{ fontSize: 12, opacity: 0.7, padding: 12 }}>Hold Shift to drag free. Use two fingers on the selected layer to scale/rotate.</div>
                   </div>
-                  {selectedImage ? (
-                    <ImagePanel value={selectedImage.adj} onChange={updateSelectedImage} onReset={resetSelectedImageAdjustments} />
-                  ) : (
-                    <div style={hint}>Select an image layer to adjust it.</div>
-                  )}
+                 {selectedImage ? (
+  <>
+    <div style={{ padding: "0 12px 12px" }}>
+      <div style={{ fontWeight: 900, marginBottom: 8 }}>Scale</div>
+
+      <input
+        type="range"
+        min="0.2"
+        max="6"
+        step="0.01"
+        value={selectedImage.scale ?? 1}
+        onChange={(e) =>
+          updateItem(selectedImage.id, {
+            scale: Number(e.target.value),
+          } as Partial<Item>)
+        }
+        style={{ width: "100%" }}
+      />
+
+      <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+        {Math.round((selectedImage.scale ?? 1) * 100)}%
+      </div>
+    </div>
+<div style={{ padding: "0 12px 12px" }}>
+  <button
+    style={btnTile}
+    onClick={applyHaydayEffect}
+    disabled={!selectedImage}
+  >
+    THE HAYDAY EFFECT
+  </button>
+</div>
+    <ImagePanel
+      value={selectedImage.adj}
+      onChange={updateSelectedImage}
+      onReset={resetSelectedImageAdjustments}
+    />
+  </>
+) : (
+  <div style={hint}>Select an image layer to adjust it.</div>
+)}
                 </>
               )}
 
@@ -2107,22 +2199,89 @@ function CanvasImageItem({
     };
   }, [item.src]);
 
-  useEffect(() => {
-    const node = nodeRef.current;
-    if (!node || !img) return;
-    node.cache();
-    node.filters([Konva.Filters.Brighten, Konva.Filters.Contrast, Konva.Filters.HSL, Konva.Filters.Blur, Konva.Filters.Noise]);
-    node.brightness(item.adj.brightness ?? 0);
-    node.hue(item.adj.hue ?? 0);
-    node.blurRadius(item.adj.blur ?? 0);
-    const clarity = item.adj.clarity ?? 0;
-    const baseContrast = item.adj.contrast ?? 0;
-    node.contrast(baseContrast + clarity * 0.75);
-    node.saturation((item.adj.saturation ?? 0) + clarity * 0.25);
-    const texture = item.adj.texture ?? 0;
-    node.noise(Math.max(0, texture * 0.25));
-    node.getLayer()?.batchDraw();
-  }, [img, item.adj, item.width, item.height]);
+useEffect(() => {
+  const node = nodeRef.current;
+  if (!node || !img) return;
+
+  const adj = item.adj ?? defaultAdj();
+
+  const brightness = adj.brightness ?? 0;
+  const exposure = adj.exposure ?? 0;
+  const contrast = adj.contrast ?? 0;
+  const saturation = adj.saturation ?? 0;
+  const hue = adj.hue ?? 0;
+  const blur = adj.blur ?? 0;
+  const clarity = adj.clarity ?? 0;
+  const texture = adj.texture ?? 0;
+const grain = adj.grain ?? 0;
+const warmth = adj.warmth ?? 0;
+const highlights = adj.highlights ?? 0;
+const shadows = adj.shadows ?? 0;
+const fade = adj.fade ?? 0;
+const hdr = adj.hdr ?? 0;
+const sharpen = adj.sharpen ?? 0;
+const curvePreset = adj.curvePreset ?? "none";
+
+  node.clearCache();
+  node.cache();
+
+  node.filters([
+    Konva.Filters.Brighten,
+    Konva.Filters.Contrast,
+    Konva.Filters.HSL,
+    Konva.Filters.Blur,
+    Konva.Filters.Noise,
+  ]);
+
+  let finalBrightness = brightness + exposure * 0.35;
+  finalBrightness += shadows * 0.12;
+  finalBrightness -= highlights * 0.08;
+  finalBrightness += fade * 0.08;
+
+ let finalContrast = contrast;
+finalContrast += clarity * 35;
+finalContrast += hdr * 18;
+finalContrast += sharpen * 16;
+
+  if (curvePreset === "medium-contrast") {
+    finalContrast += 12;
+  } else if (curvePreset === "strong-contrast") {
+    finalContrast += 24;
+  } else if (curvePreset === "fade-film") {
+    finalContrast -= 10;
+  }
+
+  finalContrast -= fade * 18;
+
+  let finalSaturation = saturation + clarity * 0.25;
+finalSaturation += sharpen * 0.06;
+
+  if (warmth > 0) {
+    finalSaturation += warmth * 0.12;
+  } else {
+    finalSaturation += warmth * 0.04;
+  }
+
+  if (curvePreset === "fade-film") {
+    finalSaturation -= 0.12;
+  }
+
+  const finalHue = hue + warmth * 10;
+
+let finalNoise = 0;
+finalNoise += texture * 0.18;
+finalNoise += grain * 0.22;
+finalNoise += sharpen * 0.04;
+
+  node.brightness(finalBrightness);
+  node.contrast(finalContrast);
+  node.saturation(finalSaturation);
+  node.hue(finalHue);
+  node.blurRadius(blur);
+  node.noise(Math.max(0, finalNoise));
+
+  node.getLayer()?.batchDraw();
+}, [img, item.adj, item.width, item.height]);
 
   return (
     <KImage
@@ -2134,6 +2293,8 @@ function CanvasImageItem({
       rotation={item.rotation}
       width={item.width * ratio}
       height={item.height * ratio}
+      scaleX={item.scale ?? 1}
+scaleY={item.scale ?? 1}
       draggable
       onClick={() => onSelect(item.id)}
       onTap={() => onSelect(item.id)}
@@ -2142,22 +2303,23 @@ function CanvasImageItem({
         onUpdate(item.id, { x: e.target.x() / ratio, y: e.target.y() / ratio });
         onDragEnd();
       }}
-      onTransformEnd={(e) => {
-        const node = e.target as Konva.Image;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        const nextW = Math.max(20, Math.round(item.width * scaleX));
-        const nextH = Math.max(20, Math.round(item.height * scaleY));
-        node.scaleX(1);
-        node.scaleY(1);
-        onUpdate(item.id, {
-          width: nextW,
-          height: nextH,
-          rotation: node.rotation(),
-          x: node.x() / ratio,
-          y: node.y() / ratio,
-        });
-      }}
+  onTransformEnd={(e) => {
+  const node = e.target as Konva.Image;
+  const scaleX = node.scaleX();
+  const scaleY = node.scaleY();
+
+  const nextScale = Math.max(0.2, Math.min((scaleX + scaleY) / 2, 8));
+
+  node.scaleX(1);
+  node.scaleY(1);
+
+  onUpdate(item.id, {
+    scale: nextScale,
+    rotation: node.rotation(),
+    x: node.x() / ratio,
+    y: node.y() / ratio,
+  });
+}}
     />
   );
 }
@@ -2256,7 +2418,7 @@ const proPill: React.CSSProperties = {
 const canvasArea: React.CSSProperties = {
   height: "calc(100vh - 64px - 58px)",
   padding: "0px 10px 0px",
-  paddingTop: "4px",
+  paddingTop: "0px",
   display: "flex",
   justifyContent: "center",
   alignItems: "flex-start",

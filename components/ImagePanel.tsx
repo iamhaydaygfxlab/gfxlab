@@ -11,6 +11,18 @@ export type ImageAdjustments = {
   hdr: number;
   texture: number;
   clarity: number;
+
+  exposure: number;
+  sharpen: number;
+  vignette: number;
+  grain: number;
+  warmth: number;
+  highlights: number;
+  shadows: number;
+  fade: number;
+  denoise: number;
+
+  curvePreset: "none" | "medium-contrast" | "strong-contrast" | "fade-film";
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -30,31 +42,187 @@ export default function ImagePanel({
     <div style={wrap}>
       <div style={{ fontWeight: 900, marginBottom: 10 }}>Image Settings</div>
 
-      <Slider label="Brightness" min={-1} max={1} step={0.05} value={value.brightness}
-        onChange={(v) => onChange({ ...value, brightness: clamp(v, -1, 1) })} />
+      <Slider
+        label="Brightness"
+        min={-1}
+        max={1}
+        step={0.05}
+        value={value.brightness}
+        onChange={(v) => onChange({ ...value, brightness: clamp(v, -1, 1) })}
+      />
 
-      <Slider label="Contrast" min={-100} max={100} step={1} value={value.contrast}
-        onChange={(v) => onChange({ ...value, contrast: clamp(v, -100, 100) })} />
+      <Slider
+        label="Exposure"
+        min={-1}
+        max={1}
+        step={0.05}
+        value={value.exposure ?? 0}
+        onChange={(v) => onChange({ ...value, exposure: clamp(v, -1, 1) })}
+      />
 
-      <Slider label="Saturation" min={-2} max={2} step={0.05} value={value.saturation}
-        onChange={(v) => onChange({ ...value, saturation: clamp(v, -2, 2) })} />
+      <Slider
+        label="Contrast"
+        min={-100}
+        max={100}
+        step={1}
+        value={value.contrast}
+        onChange={(v) => onChange({ ...value, contrast: clamp(v, -100, 100) })}
+      />
 
-      <Slider label="Hue" min={-180} max={180} step={1} value={value.hue}
-        onChange={(v) => onChange({ ...value, hue: clamp(v, -180, 180) })} />
+      <Slider
+        label="Highlights"
+        min={-1}
+        max={1}
+        step={0.05}
+        value={value.highlights ?? 0}
+        onChange={(v) => onChange({ ...value, highlights: clamp(v, -1, 1) })}
+      />
 
-      <Slider label="Blur" min={0} max={30} step={1} value={value.blur}
-        onChange={(v) => onChange({ ...value, blur: clamp(v, 0, 30) })} />
+      <Slider
+        label="Shadows"
+        min={-1}
+        max={1}
+        step={0.05}
+        value={value.shadows ?? 0}
+        onChange={(v) => onChange({ ...value, shadows: clamp(v, -1, 1) })}
+      />
 
-      <Slider label="HDR" min={0} max={1} step={0.01} value={value.hdr ?? 0}
-        onChange={(v) => onChange({ ...value, hdr: v })} />
+      <Slider
+        label="Saturation"
+        min={-2}
+        max={2}
+        step={0.05}
+        value={value.saturation}
+        onChange={(v) => onChange({ ...value, saturation: clamp(v, -2, 2) })}
+      />
 
-      <Slider label="Texture" min={0} max={1} step={0.01} value={value.texture ?? 0}
-        onChange={(v) => onChange({ ...value, texture: v })} />
+      <Slider
+        label="Warmth"
+        min={-1}
+        max={1}
+        step={0.05}
+        value={value.warmth ?? 0}
+        onChange={(v) => onChange({ ...value, warmth: clamp(v, -1, 1) })}
+      />
 
-      <Slider label="Clarity" min={0} max={1} step={0.01} value={value.clarity ?? 0}
-        onChange={(v) => onChange({ ...value, clarity: v })} />
+      <Slider
+        label="Hue"
+        min={-180}
+        max={180}
+        step={1}
+        value={value.hue}
+        onChange={(v) => onChange({ ...value, hue: clamp(v, -180, 180) })}
+      />
 
-      <button style={btn} onClick={onReset}>Reset Image Adjustments</button>
+      <Slider
+        label="Blur"
+        min={0}
+        max={30}
+        step={1}
+        value={value.blur}
+        onChange={(v) => onChange({ ...value, blur: clamp(v, 0, 30) })}
+      />
+
+      <Slider
+        label="Sharpen"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.sharpen ?? 0}
+        onChange={(v) => onChange({ ...value, sharpen: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="HDR"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.hdr ?? 0}
+        onChange={(v) => onChange({ ...value, hdr: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="Texture"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.texture ?? 0}
+        onChange={(v) => onChange({ ...value, texture: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="Clarity"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.clarity ?? 0}
+        onChange={(v) => onChange({ ...value, clarity: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="Denoise"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.denoise ?? 0}
+        onChange={(v) => onChange({ ...value, denoise: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="Grain"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.grain ?? 0}
+        onChange={(v) => onChange({ ...value, grain: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="Fade"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.fade ?? 0}
+        onChange={(v) => onChange({ ...value, fade: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="Vignette"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.vignette ?? 0}
+        onChange={(v) => onChange({ ...value, vignette: clamp(v, 0, 1) })}
+      />
+
+      <div style={{ marginTop: 12, marginBottom: 8, fontWeight: 800 }}>
+        Curve Preset
+      </div>
+
+      <select
+        value={value.curvePreset ?? "none"}
+        onChange={(e) =>
+          onChange({
+            ...value,
+            curvePreset: e.target.value as ImageAdjustments["curvePreset"],
+          })
+        }
+        style={{
+          width: "100%",
+          height: 44,
+          borderRadius: 12,
+          marginBottom: 12,
+        }}
+      >
+        <option value="none">None</option>
+        <option value="medium-contrast">Medium Contrast</option>
+        <option value="strong-contrast">Strong Contrast</option>
+        <option value="fade-film">Fade Film</option>
+      </select>
+
+      <button style={btn} onClick={onReset}>
+        Reset Image Adjustments
+      </button>
     </div>
   );
 }
