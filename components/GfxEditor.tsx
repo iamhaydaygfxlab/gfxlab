@@ -982,11 +982,19 @@ export default function GfxEditor() {
     }
   }
 
-  function deselect(e: any) {
-    const stage = stageRef.current;
-    if (!stage) return;
-    if (e.target === stage || e.target === artGroupRef.current) setSelectedId(null);
+function deselect(e: any) {
+  const stage = stageRef.current;
+  if (!stage) return;
+
+  const clickedOnEmptyStage = e.target === stage;
+  const clickedOnArtboardBg =
+    e.target?.className === "Rect" &&
+    e.target?.attrs?.listening === false;
+
+  if (clickedOnEmptyStage || clickedOnArtboardBg) {
+    setSelectedId(null);
   }
+}
 
   function applySnapping(node: Konva.Node | null) {
     if (!node) return;
