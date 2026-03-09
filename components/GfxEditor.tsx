@@ -586,7 +586,13 @@ useEffect(() => {
   const tr = trRef.current;
   if (!tr) return;
 
-  const node = selectedId ? nodeMapRef.current[selectedId] : null;
+  if (!selectedId) {
+    tr.nodes([]);
+    tr.getLayer()?.batchDraw();
+    return;
+  }
+
+  const node = nodeMapRef.current[selectedId];
 
   if (!node || nodeIsGone(node)) {
     tr.nodes([]);
@@ -595,6 +601,7 @@ useEffect(() => {
   }
 
   tr.nodes([node]);
+  tr.forceUpdate();
   tr.getLayer()?.batchDraw();
 }, [selectedId, items]);
   useEffect(() => {
@@ -2114,8 +2121,10 @@ function CanvasTextItem({
       y={scaledY}
       rotation={item.rotation}
       draggable
-      onClick={() => onSelect(item.id)}
-      onTap={() => onSelect(item.id)}
+    onMouseDown={() => onSelect(item.id)}
+onTouchStart={() => onSelect(item.id)}
+onClick={() => onSelect(item.id)}
+onTap={() => onSelect(item.id)}
       onDragMove={(e) => onDragMove(e.target)}
       onDragEnd={(e) => {
         onUpdate(item.id, { x: e.target.x() / ratio, y: e.target.y() / ratio });
