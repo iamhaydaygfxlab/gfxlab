@@ -2314,12 +2314,12 @@ dragBoundFunc={(pos) => {
   const scaledW = item.width * ratio * (item.scale ?? 1);
   const scaledH = item.height * ratio * (item.scale ?? 1);
 
-  const maxX = Math.max(0, canvasW - scaledW);
-  const maxY = Math.max(0, canvasH - scaledH);
+  const minX = canvasW - scaledW;
+  const minY = canvasH - scaledH;
 
   return {
-    x: Math.min(Math.max(pos.x, 0), maxX),
-    y: Math.min(Math.max(pos.y, 0), maxY),
+    x: Math.min(0, Math.max(pos.x, minX)),
+    y: Math.min(0, Math.max(pos.y, minY)),
   };
 }}
   onTransformEnd={(e) => {
