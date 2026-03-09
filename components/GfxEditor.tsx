@@ -1667,7 +1667,7 @@ onTouchStart={(e) => {
               </Group>
             </Layer>
 
-            <Layer listening={false}>
+            <Layer>
               {guides.map((g, idx) =>
                 g.kind === "v" ? (
                   <Line
@@ -1676,6 +1676,7 @@ onTouchStart={(e) => {
                     stroke="rgba(255,255,255,0.6)"
                     strokeWidth={1}
                     dash={[6, 6]}
+                    listening={false}
                   />
                 ) : (
                   <Line
@@ -1684,6 +1685,7 @@ onTouchStart={(e) => {
                     stroke="rgba(255,255,255,0.6)"
                     strokeWidth={1}
                     dash={[6, 6]}
+                    listening={false}
                   />
                 )
               )}
@@ -1697,26 +1699,27 @@ onTouchStart={(e) => {
                   stroke="#ff3b3b"
                   strokeWidth={2}
                   dash={[8, 6]}
+                  listening={false}
                 />
               )}
 
               {!exporting && (
-            <Transformer
-  ref={trRef}
-  rotateEnabled
-  enabledAnchors={[
-    "top-left",
-    "top-right",
-    "bottom-left",
-    "bottom-right"
-  ]}
-  boundBoxFunc={(oldBox, newBox) => {
-    if (newBox.width < 40 || newBox.height < 40) {
-      return oldBox;
-    }
-    return newBox;
-  }}
-/>
+                <Transformer
+                  ref={trRef}
+                  rotateEnabled
+                  enabledAnchors={[
+                    "top-left",
+                    "top-right",
+                    "bottom-left",
+                    "bottom-right",
+                  ]}
+                  boundBoxFunc={(oldBox, newBox) => {
+                    if (newBox.width < 40 || newBox.height < 40) {
+                      return oldBox;
+                    }
+                    return newBox;
+                  }}
+                />
               )}
             </Layer>
           </Stage>
