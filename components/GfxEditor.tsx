@@ -157,15 +157,15 @@ function defaultText(): TextItem {
   return {
     id: uid(),
     kind: "text",
-    x: 210,
-    y: 180,
+    x: 1500,
+    y: 1300,
     rotation: 0,
     text: "Create",
     fontFamily: "Impact",
-    fontSize: 80,
+    fontSize: 500,
     fontWeight: 800,
     fontStyle: "normal",
-    fill: "#ff0000",
+    fill: "#d5ad33",
     align: "center",
     letterSpacing: 0,
     lineHeight: 1.15,
@@ -1572,7 +1572,7 @@ function applyHaydayEffect() {
             scaleY={stageScale}
             x={stagePos.x}
             y={stagePos.y}
-            draggable={stageScale > 1 && !pinchRef.current}
+      draggable={false}
        onMouseDown={(e) => {
   if (e.target === e.target.getStage()) {
     deselect(e);
@@ -2325,25 +2325,33 @@ finalNoise += sharpen * 0.04;
   scaleX={item.scale ?? 1}
   scaleY={item.scale ?? 1}
   draggable
-
+  onMouseDown={() => onSelect(item.id)}
+  onTouchStart={() => onSelect(item.id)}
+  onClick={() => onSelect(item.id)}
+  onTap={() => onSelect(item.id)}
+  onDragMove={(e) => onDragMove(e.target)}
+  onDragEnd={(e) => {
+    onUpdate(item.id, { x: e.target.x() / ratio, y: e.target.y() / ratio });
+    onDragEnd();
+  }}
   onTransformEnd={(e) => {
-  const node = e.target as Konva.Image;
-  const scaleX = node.scaleX();
-  const scaleY = node.scaleY();
+    const node = e.target as Konva.Image;
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
 
-  const nextScale = Math.max(0.2, Math.min((scaleX + scaleY) / 2, 8));
+    const nextScale = Math.max(0.2, Math.min((scaleX + scaleY) / 2, 8));
 
-  node.scaleX(1);
-  node.scaleY(1);
+    node.scaleX(1);
+    node.scaleY(1);
 
-  onUpdate(item.id, {
-    scale: nextScale,
-    rotation: node.rotation(),
-    x: node.x() / ratio,
-    y: node.y() / ratio,
-  });
-}}
-    />
+    onUpdate(item.id, {
+      scale: nextScale,
+      rotation: node.rotation(),
+      x: node.x() / ratio,
+      y: node.y() / ratio,
+    });
+  }}
+/>
   );
 }
 
