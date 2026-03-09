@@ -582,25 +582,21 @@ export default function GfxEditor() {
     };
   }, [bgSrc]);
 
-  useEffect(() => {
-    const tr = trRef.current;
-    if (!tr) return;
+useEffect(() => {
+  const tr = trRef.current;
+  if (!tr) return;
+
+  const node = selectedId ? nodeMapRef.current[selectedId] : null;
+
+  if (!node || nodeIsGone(node)) {
     tr.nodes([]);
     tr.getLayer()?.batchDraw();
-    if (!selectedId) return;
-    const t = window.setTimeout(() => {
-      const node = nodeMapRef.current[selectedId];
-      if (!node || nodeIsGone(node)) {
-        tr.nodes([]);
-        tr.getLayer()?.batchDraw();
-        return;
-      }
-      tr.nodes([node]);
-      tr.getLayer()?.batchDraw();
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, [selectedId, items]);
+    return;
+  }
 
+  tr.nodes([node]);
+  tr.getLayer()?.batchDraw();
+}, [selectedId, items]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
