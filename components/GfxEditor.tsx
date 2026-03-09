@@ -982,16 +982,11 @@ function deselect(e: any) {
   const stage = stageRef.current;
   if (!stage) return;
 
-  const clickedOnEmptyStage = e.target === stage;
-  const clickedOnArtboardBg =
-    e.target?.className === "Rect" &&
-    e.target?.attrs?.listening === false;
-
-  if (clickedOnEmptyStage || clickedOnArtboardBg) {
+  const clickedOnStage = e.target === stage;
+  if (clickedOnStage) {
     setSelectedId(null);
   }
 }
-
   function applySnapping(node: Konva.Node | null) {
     if (!node) return;
     if (!snapEnabled || shiftDownRef.current) {
@@ -1571,14 +1566,21 @@ function applyHaydayEffect() {
             x={stagePos.x}
             y={stagePos.y}
             draggable={stageScale > 1 && !pinchRef.current}
-            onMouseDown={deselect}
-            onTouchStart={(e) => {
-              if (e.evt.touches.length === 2) {
-                beginPinchGesture(e);
-                return;
-              }
-              if (e.evt.touches.length === 1) deselect(e);
-            }}
+       onMouseDown={(e) => {
+  if (e.target === e.target.getStage()) {
+    deselect(e);
+  }
+}}
+onTouchStart={(e) => {
+  if (e.evt.touches.length === 2) {
+    beginPinchGesture(e);
+    return;
+  }
+
+  if (e.evt.touches.length === 1 && e.target === e.target.getStage()) {
+    deselect(e);
+  }
+}}
             onTouchMove={(e) => {
               if (e.evt.touches.length === 2) movePinchGesture(e);
             }}
