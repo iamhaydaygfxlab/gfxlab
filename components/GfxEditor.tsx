@@ -608,16 +608,56 @@ useEffect(() => {
   tr.forceUpdate();
   tr.getLayer()?.batchDraw();
 }, [selectedId, items]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const run = async () => {
     const params = new URLSearchParams(window.location.search);
     const exportStatus = params.get("export");
-    if (exportStatus === "success") {
-      sessionStorage.setItem("paid_export", "true");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
+    const sessionId = params.get("session_id");
 
+    if (!exportStatus) return;
+
+    if (!sessionId) {
+      console.error("Missing session_id in return URL");
+      window.history.replaceState({}, "", "/editor");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/stripe/verify-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.ok || !data?.paid) {
+        console.error("Stripe session verification failed:", data);
+        window.history.replaceState({}, "", "/editor");
+        return;
+      }
+
+      if (exportStatus === "success") {
+        sessionStorage.setItem("paid_export", "true");
+      }
+
+      if (exportStatus === "music-success") {
+        sessionStorage.setItem("paid_music_export", "true");
+      }
+
+      window.history.replaceState({}, "", "/editor");
+    } catch (err) {
+      console.error("Stripe verification error:", err);
+      window.history.replaceState({}, "", "/editor");
+    }
+  };
+
+  run();
+}, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
     (async () => {
@@ -639,18 +679,31 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!checkoutRestoreReady) return;
-    const paidExport = sessionStorage.getItem("paid_export");
-    if (paidExport !== "true") return;
-    const t = window.setTimeout(async () => {
+  if (typeof window === "undefined") return;
+  if (!checkoutRestoreReady) return;
+
+  const paidExport = sessionStorage.getItem("paid_export");
+  const paidMusicExport = sessionStorage.getItem("paid_music_export");
+
+  if (paidExport !== "true" && paidMusicExport !== "true") return;
+
+  const t = window.setTimeout(async () => {
+    if (paidExport === "true") {
       await exportPNG();
       sessionStorage.removeItem("paid_export");
       await deletePendingDesign("gfxlab_pending_export_design");
-    }, 1200);
-    return () => window.clearTimeout(t);
-  }, [checkoutRestoreReady, bgImg, presetId, projectType]);
+      return;
+    }
 
+    if (paidMusicExport === "true") {
+      await exportBundleFiles();
+      sessionStorage.removeItem("paid_music_export");
+      await deletePendingDesign("gfxlab_pending_export_design");
+    }
+  }, 1200);
+
+  return () => window.clearTimeout(t);
+}, [checkoutRestoreReady, bgImg, presetId, projectType, musicFile, clipStart, clipDuration]);
   function toSafeSrc(src: string) {
     if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) return src;
     if (src.startsWith("http://") || src.startsWith("https://")) {

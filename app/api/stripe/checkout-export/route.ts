@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     form.append("mode", "payment");
     form.append("line_items[0][price]", priceId);
     form.append("line_items[0][quantity]", "1");
-    form.append("success_url", `${appUrl}/editor?export=success`);
+ form.append("success_url", `${appUrl}/editor?export=success&session_id={CHECKOUT_SESSION_ID}`);
     form.append("cancel_url", `${appUrl}/editor?export=cancel`);
 
     if (uid) form.append("metadata[uid]", uid);

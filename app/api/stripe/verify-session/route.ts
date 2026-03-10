@@ -1,27 +1,61 @@
-// app/api/stripe/verify-session/route.ts
-import { NextResponse } from "next/server";
-import Stripe from "stripe";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { session_id } = await req.json();
+    const secretKey = process.env.STRIPE_SECRET_KEY;
 
-    if (!session_id || typeof session_id !== "string") {
-      return NextResponse.json({ error: "Missing session_id" }, { status: 400 });
+    if (!secretKey) {
+      return NextResponse.json(
+        { ok: false, error: "Missing STRIPE_SECRET_KEY" },
+        { status: 500 }
+      );
     }
 
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    const body = await req.json();
+    const sessionId = body?.sessionId;
 
-    // Stripe sets payment_status = "paid" when completed
+    if (!sessionId) {
+      return NextResponse.json(
+        { ok: false, error: "Missing sessionId" },
+        { status: 400 }
+      );
+    }
+
+    const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+      },
+      cache: "no-store",
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { ok: false, error: text },
+        { status: 500 }
+      );
+    }
+
+    const session = JSON.parse(text);
+
     const paid = session.payment_status === "paid";
 
-    return NextResponse.json({ paid });
+    return NextResponse.json({
+      ok: true,
+      paid,
+      sessionId: session.id,
+      metadata: session.metadata || {},
+      amount_total: session.amount_total,
+      currency: session.currency,
+    });
   } catch (err: any) {
-    console.error("VERIFY SESSION ERROR:", err);
-    return NextResponse.json({ error: err?.message || "Verify failed" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Verification failed" },
+      { status: 500 }
+    );
   }
 }
