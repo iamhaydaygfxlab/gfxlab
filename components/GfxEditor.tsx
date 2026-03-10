@@ -321,7 +321,29 @@ async function deletePendingDesign(key: string) {
     tx.onerror = () => reject(tx.error);
   });
 }
+async function savePendingMusicExport(data: {
+  audioBlob: Blob;
+  fileName: string;
+  fileType: string;
+  clipStart: number;
+  clipDuration: number;
+}) {
+  await savePendingDesign("gfxlab_pending_music_export", data);
+}
 
+async function loadPendingMusicExport(): Promise<{
+  audioBlob: Blob;
+  fileName: string;
+  fileType: string;
+  clipStart: number;
+  clipDuration: number;
+} | null> {
+  return await loadPendingDesign("gfxlab_pending_music_export");
+}
+
+async function deletePendingMusicExport() {
+  await deletePendingDesign("gfxlab_pending_music_export");
+}
 export default function GfxEditor() {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
@@ -680,6 +702,32 @@ useEffect(() => {
 
   useEffect(() => {
   if (typeof window === "undefined") return;
+
+  (async () => {
+    try {
+      const pendingMusic = await loadPendingMusicExport();
+      if (!pendingMusic) return;
+
+      const restoredFile = new File(
+        [pendingMusic.audioBlob],
+        pendingMusic.fileName,
+        { type: pendingMusic.fileType }
+      );
+
+      const restoredUrl = URL.createObjectURL(restoredFile);
+
+      setMusicFile(restoredFile);
+      setMusicUrl(restoredUrl);
+      setClipStart(pendingMusic.clipStart);
+      setClipDuration(pendingMusic.clipDuration);
+    } catch (err) {
+      console.error("Could not restore pending music export:", err);
+    }
+  })();
+}, []);
+
+  useEffect(() => {
+  if (typeof window === "undefined") return;
   if (!checkoutRestoreReady) return;
 
   const paidExport = sessionStorage.getItem("paid_export");
@@ -695,11 +743,13 @@ useEffect(() => {
       return;
     }
 
-    if (paidMusicExport === "true") {
-      await exportBundleFiles();
-      sessionStorage.removeItem("paid_music_export");
-      await deletePendingDesign("gfxlab_pending_export_design");
-    }
+ if (paidMusicExport === "true") {
+  await exportBundleFiles();
+  sessionStorage.removeItem("paid_music_export");
+  sessionStorage.removeItem("pending_music_export");
+  await deletePendingDesign("gfxlab_pending_export_design");
+  await deletePendingMusicExport();
+}
   }, 1200);
 
   return () => window.clearTimeout(t);
@@ -1459,13 +1509,21 @@ async function exportBundleFiles() {
     if (typeof window !== "undefined" && guestId) localStorage.setItem("gfxlab_guest_id", guestId);
     window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(guestId)}`;
   }
-  async function handleMusicExport() {
+async function handleMusicExport() {
   if (!musicFile) {
     alert("Please upload a music file first.");
     return;
   }
 
   await saveCurrentDesignForCheckout();
+
+  await savePendingMusicExport({
+    audioBlob: musicFile,
+    fileName: musicFile.name,
+    fileType: musicFile.type || "audio/mpeg",
+    clipStart,
+    clipDuration,
+  });
 
   if (typeof window !== "undefined") {
     sessionStorage.setItem("pending_music_export", "true");
