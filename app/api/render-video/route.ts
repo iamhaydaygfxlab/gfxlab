@@ -1,12 +1,21 @@
 import { NextRequest } from "next/server";
 import ffmpeg from "fluent-ffmpeg";
+import ffmpegStatic from "ffmpeg-static";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { randomUUID } from "crypto";
 
+export const runtime = "nodejs";
+
 const resolvedFfmpegPath =
-  "C:\\Users\\Owner\\Documents\\gfxlab\\GFXlabApp\\node_modules\\ffmpeg-static\\ffmpeg.exe";
+  typeof ffmpegStatic === "string"
+    ? ffmpegStatic
+    : (ffmpegStatic as unknown as { default?: string })?.default ?? "";
+
+if (!resolvedFfmpegPath) {
+  throw new Error("FFmpeg path could not be resolved.");
+}
 
 ffmpeg.setFfmpegPath(resolvedFfmpegPath);
 console.log("FFmpeg path:", resolvedFfmpegPath);
