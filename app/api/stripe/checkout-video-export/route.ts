@@ -1,56 +1,70 @@
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { NextResponse } from "next/server";
 
-const secretKey = process.env.STRIPE_SECRET_KEY;
-const priceId = process.env.STRIPE_VIDEO_EXPORT_PRICE_ID;
-const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+export const runtime = "nodejs";
 
-if (!secretKey) {
-  throw new Error("Missing STRIPE_SECRET_KEY");
-}
-
-const stripe = new Stripe(secretKey);
-
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   try {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    const priceId = process.env.STRIPE_VIDEO_EXPORT_PRICE_ID;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    if (!secretKey) {
+      return new NextResponse("Missing STRIPE_SECRET_KEY", { status: 500 });
+    }
+
     if (!priceId) {
-      throw new Error("Missing STRIPE_VIDEO_EXPORT_PRICE_ID");
+      return new NextResponse("Missing STRIPE_VIDEO_EXPORT_PRICE_ID", { status: 500 });
     }
 
     if (!appUrl) {
-      throw new Error("Missing NEXT_PUBLIC_APP_URL");
+      return new NextResponse("Missing NEXT_PUBLIC_APP_URL", { status: 500 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const guestId = searchParams.get("guestId") || "";
+    const url = new URL(req.url);
+    const guestId = url.searchParams.get("guestId");
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${appUrl}/editor?export=music-success`,
-      cancel_url: `${appUrl}/editor`,
-      metadata: {
-        guestId,
-        exportType: "music_bundle",
+    const form = new URLSearchParams();
+    form.append("mode", "payment");
+    form.append("line_items[0][price]", priceId);
+    form.append("line_items[0][quantity]", "1");
+    form.append("success_url", `${appUrl}/editor?export=music-success`);
+    form.append("cancel_url", `${appUrl}/editor?export=cancel`);
+
+    if (guestId) form.append("metadata[guestId]", guestId);
+    form.append("metadata[exportType]", "music_bundle");
+
+    const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
+      body: form.toString(),
+      cache: "no-store",
     });
 
+    const text = await res.text();
+
+    if (!res.ok) {
+      return new NextResponse(`Checkout-video-export failed: ${text}`, {
+        status: 500,
+      });
+    }
+
+    const session = JSON.parse(text);
+
     if (!session.url) {
-      throw new Error("Stripe session created without a checkout URL");
+      return new NextResponse(
+        "Checkout-video-export failed: Stripe did not return a checkout URL",
+        { status: 500 }
+      );
     }
 
     return NextResponse.redirect(session.url);
-  } catch (error) {
-    console.error("checkout-video-export error:", error);
-
-    const message =
-      error instanceof Error ? error.message : "Could not create checkout session";
-
-    return new NextResponse(message, { status: 500 });
+  } catch (err: any) {
+    return new NextResponse(
+      `Checkout-video-export failed: ${err?.message || "Unknown error"}`,
+      { status: 500 }
+    );
   }
 }
