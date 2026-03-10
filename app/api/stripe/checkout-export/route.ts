@@ -23,29 +23,36 @@ export async function GET(req: Request) {
 
     const stripe = new Stripe(stripeSecretKey);
 
-    const price = await stripe.prices.retrieve(exportPriceId);
+    const url = new URL(req.url);
+    const uid = url.searchParams.get("uid");
+    const guestId = url.searchParams.get("guestId");
 
-    return NextResponse.json({
-      ok: true,
-      priceId: price.id,
-      active: price.active,
-      livemode: price.livemode,
-      appUrl,
-      keyPrefix: stripeSecretKey.slice(0, 8),
+    const metadata: Record<string, string> = {};
+    if (uid) metadata.uid = uid;
+    if (guestId) metadata.guestId = guestId;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price: exportPriceId,
+          quantity: 1,
+        },
+      ],
+      metadata,
+      success_url: `${appUrl}/editor?export=success`,
+      cancel_url: `${appUrl}/editor?export=cancel`,
     });
+
+    if (!session.url) {
+      return new NextResponse("Stripe did not return a checkout URL", { status: 500 });
+    }
+
+    return NextResponse.redirect(session.url);
   } catch (err: any) {
-    console.error("STRIPE DIAG ERROR", {
-      name: err?.name,
-      message: err?.message,
-      type: err?.type,
-      code: err?.code,
-      statusCode: err?.statusCode,
-      rawMessage: err?.raw?.message,
-      stack: err?.stack,
-    });
-
+    console.error("checkout-export error:", err?.message || err);
     return new NextResponse(
-      `Stripe diag failed: ${err?.raw?.message || err?.message || "Unknown error"}`,
+      `Checkout-export failed: ${err?.raw?.message || err?.message || "Unknown error"}`,
       { status: 500 }
     );
   }
