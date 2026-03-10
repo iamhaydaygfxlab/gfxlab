@@ -2,11 +2,11 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.gfxlab.app",
-  appName: "GfxLab",
-  webDir: "www",
+  appName: "GFXLab",
+  webDir: "out",
   server: {
-    url: "http://10.0.2.2:3000",
-    cleartext: true,
+    url: "https://gfxlab.vercel.app",
+    cleartext: false,
   },
 };
 

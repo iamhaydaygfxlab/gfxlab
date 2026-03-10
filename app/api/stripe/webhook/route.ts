@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export const runtime = "nodejs";
 
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
         if (uid) {
           await adminDb.collection("users").doc(uid).set(
             {
-              exportCredits: 1,
+              exportCredits: FieldValue.increment(1),
               updatedAt: Date.now(),
             },
             { merge: true }
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
           await adminDb.collection("guestExports").doc(guestId).set(
             {
               paid: true,
-              exportCredits: 1,
+              exportCredits: FieldValue.increment(1),
               updatedAt: Date.now(),
             },
             { merge: true }
