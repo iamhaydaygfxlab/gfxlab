@@ -25,12 +25,13 @@ import {
 import { app, db } from "@/lib/firebase";
 import { cutoutPersonToPngDataUrl } from "@/lib/cutout";
 import AssetLibrary, { type AssetItem } from "./AssetLibrary";
-import ExportButton from "./ExportButton";
+
 import FontPanel from "./FontPanel";
 import ImagePanel, { type ImageAdjustments } from "./ImagePanel";
 import LayersPanel from "./LayersPanel";
 import TemplateLibrary from "./TemplateLibrary";
 import { type FireTemplate } from "@/lib/templates";
+import MusicClipPicker from "./MusicClipPicker";
 
 async function ensureFontLoaded(fontFamily: string) {
   if (!fontFamily) return;
@@ -395,9 +396,9 @@ export default function GfxEditor() {
       ? isMobile
         ? "min(360px, 42vh)"
         : "min(280px, 30vh)"
-      : tab === "export"
-      ? "min(200px, 24vh)"
-      : "min(220px, 24vh)";
+     : tab === "export"
+? "min(420px, 48vh)"
+: "min(360px, 48vh)";
 
   const panelReserve =
   tab !== "none"
@@ -441,7 +442,10 @@ export default function GfxEditor() {
     if (node) nodeMapRef.current[id] = node;
     else delete nodeMapRef.current[id];
   }, []);
-
+const [musicFile, setMusicFile] = useState<File | null>(null);
+const [musicUrl, setMusicUrl] = useState("");
+const [clipStart, setClipStart] = useState(0);
+const [clipDuration, setClipDuration] = useState(30);
   function snapshotNow(): Snapshot {
     return {
       items: JSON.parse(JSON.stringify(items)),
@@ -659,7 +663,12 @@ useEffect(() => {
   function updateItem(id: string, patch: Partial<Item>) {
     setItems((prev) => prev.map((i) => (i.id === id ? ({ ...i, ...patch } as Item) : i)));
   }
-
+function handleMusicChange(file: File | null, url: string, start: number, duration: number) {
+  if (file) setMusicFile(file);
+  setMusicUrl(url);
+  setClipStart(start);
+  setClipDuration(duration);
+}
   function updateSelectedText(next: Partial<TextItem>) {
     if (!selectedText) return;
     updateItem(selectedText.id, { ...selectedText, ...next });
@@ -1191,7 +1200,145 @@ function deselect(e: any) {
     if (pinchRef.current?.mode === "node") commitSelectedNodeTouchTransform();
     pinchRef.current = null;
   }
+async function exportCanvasBlob(): Promise<Blob | null> {
+  const stage = stageRef.current;
+  if (!stage) return null;
 
+  setExporting(true);
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  );
+
+  const oldScaleX = stage.scaleX();
+  const oldScaleY = stage.scaleY();
+  const oldX = stage.x();
+  const oldY = stage.y();
+  const oldDraggable = stage.draggable();
+
+  try {
+    stage.scale({ x: 1, y: 1 });
+    stage.position({ x: 0, y: 0 });
+    stage.draggable(false);
+    stage.batchDraw();
+
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve())
+    );
+
+    const dataUrl = stage.toDataURL({
+      x: view.x,
+      y: view.y,
+      width: view.w,
+      height: view.h,
+      pixelRatio: preset.w / view.w,
+      mimeType: "image/png",
+    });
+
+    const img = await loadHtmlImage(dataUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = preset.w;
+    canvas.height = preset.h;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context not available");
+
+    ctx.clearRect(0, 0, preset.w, preset.h);
+    ctx.drawImage(img, 0, 0, preset.w, preset.h);
+
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/png")
+    );
+
+    return blob;
+  } catch (err) {
+    console.error("Export blob failed:", err);
+    alert("Could not prepare image for video export.");
+    return null;
+  } finally {
+    stage.scale({ x: oldScaleX, y: oldScaleY });
+    stage.position({ x: oldX, y: oldY });
+    stage.draggable(oldDraggable);
+    stage.batchDraw();
+    setTimeout(() => setExporting(false), 80);
+  }
+}
+      async function testExportBlob() {
+  const blob = await exportCanvasBlob();
+  if (!blob) return;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "test-cover.png";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+async function exportVideoFile() {
+  try {
+    if (!musicFile) {
+      alert("Please upload a music file first.");
+      return;
+    }
+
+    const coverBlob = await exportCanvasBlob();
+    if (!coverBlob) {
+      alert("Could not prepare cover image.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("cover", coverBlob, "cover.png");
+    formData.append("audio", musicFile);
+    formData.append("clipStart", String(clipStart));
+    formData.append("clipDuration", String(clipDuration));
+
+    const res = await fetch("/api/render-video", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(errText);
+      alert("Video render failed.");
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "gfxlab-video.mp4";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong during video export.");
+  }
+}
+async function exportBundleFiles() {
+  try {
+    if (!musicFile) {
+      alert("Please upload a music file first.");
+      return;
+    }
+
+    await exportPNG();
+
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    await exportVideoFile();
+  } catch (err) {
+    console.error(err);
+    alert("Bundle export failed.");
+  }
+}
   async function exportPNG() {
     const stage = stageRef.current;
     if (!stage) return;
@@ -1251,6 +1398,7 @@ function deselect(e: any) {
   async function handleExport() {
     if (paid) {
       exportPNG();
+
       return;
     }
     await saveCurrentDesignForCheckout();
@@ -1258,6 +1406,31 @@ function deselect(e: any) {
     if (typeof window !== "undefined" && guestId) localStorage.setItem("gfxlab_guest_id", guestId);
     window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(guestId)}`;
   }
+  async function handleMusicExport() {
+  if (!musicFile) {
+    alert("Please upload a music file first.");
+    return;
+  }
+
+  await saveCurrentDesignForCheckout();
+
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem("pending_music_export", "true");
+  }
+
+  const guestId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+      : "";
+
+  if (typeof window !== "undefined" && guestId) {
+    localStorage.setItem("gfxlab_guest_id", guestId);
+  }
+
+  window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(
+    guestId
+  )}`;
+}
 
   function loadTemplate(template: FireTemplate) {
     setProjectType(template.type);
@@ -1564,6 +1737,11 @@ function applyHaydayEffect() {
 
       <div style={canvasArea}>
         <div ref={canvasHostRef} style={canvasWrap}>
+      
+
+
+
+          
           <Stage
             ref={stageRef as any}
             width={hostSize.w}
@@ -1731,25 +1909,12 @@ onTouchStart={(e) => {
         <TabBtn label="Text" active={tab === "text"} onClick={() => setTab(tab === "text" ? "none" : "text")} />
         <TabBtn label="Adjust" active={tab === "adjust"} onClick={() => setTab(tab === "adjust" ? "none" : "adjust")} />
         <TabBtn label="Layers" active={tab === "layers"} onClick={() => setTab(tab === "layers" ? "none" : "layers")} />
-        <ExportButton
-          label={paid ? "Export" : "Export $5"}
-          onExport={handleExport}
-          buttonStyle={{
-            flex: 1,
-            minWidth: 0,
-            height: 46,
-            margin: "0 4px",
-            borderRadius: 11,
-            border: "1px solid rgba(255,255,255,0.22)",
-            background: "rgba(0,0,0,0.22)",
-            color: "white",
-            fontWeight: 900,
-            fontSize: 11,
-            opacity: 1,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        />
+<TabBtn
+  label="Export"
+  active={tab === "export"}
+  onClick={() => setTab(tab === "export" ? "none" : "export")}
+/>
+         
       </div>
 
       {tab !== "none" && (
@@ -1983,7 +2148,6 @@ onTouchStart={(e) => {
 )}
                 </>
               )}
-
               {tab === "layers" && (
                 <>
                   <div style={{ padding: 10, display: "grid", gap: 8 }}>
@@ -2017,11 +2181,37 @@ onTouchStart={(e) => {
                 </>
               )}
 
-              {tab === "export" && (
-                <div style={{ padding: 20 }}>
-                  <button style={tileBtn} onClick={exportPNG}>Export PNG</button>
-                </div>
-              )}
+
+{tab === "export" && (
+  <div style={{ padding: 12, display: "grid", gap: 12 }}>
+    <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
+
+    <button style={tileBtn} onClick={handleExport}>
+      Export PNG $5
+    </button>
+
+    <div
+      style={{
+        height: 1,
+        background: "rgba(255,255,255,0.12)",
+        margin: "4px 0",
+      }}
+    />
+
+    <div style={{ fontWeight: 900, fontSize: 15 }}>Add Music for Video Export</div>
+
+    <MusicClipPicker
+      musicUrl={musicUrl}
+      clipStart={clipStart}
+      clipDuration={clipDuration}
+      onMusicChange={handleMusicChange}
+    />
+
+ <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
+  Export PNG + MP4 $8
+</button>
+  </div>
+)}
             </div>
           </div>
         </div>
