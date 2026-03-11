@@ -4,12 +4,12 @@ import path from "path";
 import os from "os";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const execFileAsync = promisify(execFile);
+const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
 
 async function writeTempFile(filePath: string, data: Buffer) {
   await fs.writeFile(filePath, data);
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     const audioBuffer = Buffer.from(audioArrayBuffer);
     await writeTempFile(audioPath, audioBuffer);
 
-    const ffmpegPath = ffmpegInstaller.path;
+    const ffmpegPath: string = ffmpegInstaller.path;
 
     if (!ffmpegPath) {
       return NextResponse.json(
