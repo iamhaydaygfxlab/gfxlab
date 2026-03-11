@@ -4,6 +4,7 @@ import path from "path";
 import os from "os";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import ffmpegPath from "ffmpeg-static";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,10 +22,6 @@ async function fileExists(filePath: string) {
   } catch {
     return false;
   }
-}
-
-function getFfmpegPath() {
-  return process.env.FFMPEG_PATH || "ffmpeg";
 }
 
 export async function POST(req: Request) {
@@ -68,25 +65,29 @@ export async function POST(req: Request) {
     const audioBuffer = Buffer.from(audioArrayBuffer);
     await writeTempFile(audioPath, audioBuffer);
 
-    const ffmpegPath = getFfmpegPath();
+    if (!ffmpegPath) {
+      return NextResponse.json(
+        { error: "ffmpeg binary not available." },
+        { status: 500 }
+      );
+    }
 
     const args = [
       "-y",
-
       "-loop",
       "1",
       "-i",
       coverPath,
-
       "-ss",
       String(clipStart),
       "-t",
       String(clipDuration),
       "-i",
       audioPath,
-
       "-c:v",
       "libx264",
+      "-preset",
+      "veryfast",
       "-tune",
       "stillimage",
       "-c:a",
@@ -96,10 +97,10 @@ export async function POST(req: Request) {
       "-pix_fmt",
       "yuv420p",
       "-shortest",
-
+      "-movflags",
+      "+faststart",
       "-vf",
       "scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2",
-
       outputPath,
     ];
 

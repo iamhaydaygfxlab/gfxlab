@@ -1419,68 +1419,79 @@ export default function GfxEditor() {
     if (pinchRef.current?.mode === "node") commitSelectedNodeTouchTransform();
     pinchRef.current = null;
   }
+async function exportCanvasBlob(targetSize?: { width: number; height: number }): Promise<Blob | null> {
+  const stage = stageRef.current;
+  if (!stage) return null;
 
-  async function exportCanvasBlob(): Promise<Blob | null> {
-    const stage = stageRef.current;
-    if (!stage) return null;
+  setExporting(true);
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  );
 
-    setExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 120));
+  const oldScaleX = stage.scaleX();
+  const oldScaleY = stage.scaleY();
+  const oldX = stage.x();
+  const oldY = stage.y();
+  const oldDraggable = stage.draggable();
+
+  try {
+    stage.scale({ x: 1, y: 1 });
+    stage.position({ x: 0, y: 0 });
+    stage.draggable(false);
+    stage.batchDraw();
+
     await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      requestAnimationFrame(() => resolve())
     );
 
-    const oldScaleX = stage.scaleX();
-    const oldScaleY = stage.scaleY();
-    const oldX = stage.x();
-    const oldY = stage.y();
-    const oldDraggable = stage.draggable();
+    const dataUrl = stage.toDataURL({
+      x: view.x,
+      y: view.y,
+      width: view.w,
+      height: view.h,
+      pixelRatio: preset.w / view.w,
+      mimeType: "image/png",
+    });
 
-    try {
-      stage.scale({ x: 1, y: 1 });
-      stage.position({ x: 0, y: 0 });
-      stage.draggable(false);
-      stage.batchDraw();
+    const img = await loadHtmlImage(dataUrl);
 
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const outW = targetSize?.width ?? preset.w;
+    const outH = targetSize?.height ?? preset.h;
 
-      const dataUrl = stage.toDataURL({
-        x: view.x,
-        y: view.y,
-        width: view.w,
-        height: view.h,
-        pixelRatio: preset.w / view.w,
-        mimeType: "image/png",
-      });
+    const canvas = document.createElement("canvas");
+    canvas.width = outW;
+    canvas.height = outH;
 
-      const img = await loadHtmlImage(dataUrl);
-      const canvas = document.createElement("canvas");
-      canvas.width = preset.w;
-      canvas.height = preset.h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context not available");
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas context not available");
+    ctx.clearRect(0, 0, outW, outH);
+    ctx.drawImage(img, 0, 0, outW, outH);
 
-      ctx.clearRect(0, 0, preset.w, preset.h);
-      ctx.drawImage(img, 0, 0, preset.w, preset.h);
+    const mimeType =
+      targetSize?.width || targetSize?.height ? "image/jpeg" : "image/png";
 
-      const blob: Blob | null = await new Promise((resolve) =>
-        canvas.toBlob((b) => resolve(b), "image/png")
-      );
+    const quality =
+      mimeType === "image/jpeg" ? 0.88 : undefined;
 
-      return blob;
-    } catch (err) {
-      console.error("Export blob failed:", err);
-      alert("Could not prepare image for video export.");
-      return null;
-    } finally {
-      stage.scale({ x: oldScaleX, y: oldScaleY });
-      stage.position({ x: oldX, y: oldY });
-      stage.draggable(oldDraggable);
-      stage.batchDraw();
-      setTimeout(() => setExporting(false), 80);
-    }
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), mimeType, quality)
+    );
+
+    return blob;
+  } catch (err) {
+    console.error("Export blob failed:", err);
+    alert("Could not prepare image for video export.");
+    return null;
+  } finally {
+    stage.scale({ x: oldScaleX, y: oldScaleY });
+    stage.position({ x: oldX, y: oldY });
+    stage.draggable(oldDraggable);
+    stage.batchDraw();
+    setTimeout(() => setExporting(false), 80);
   }
+}
 
   async function testExportBlob() {
     const blob = await exportCanvasBlob();
@@ -1503,14 +1514,14 @@ async function exportVideoFile() {
       return;
     }
 
-    const coverBlob = await exportCanvasBlob();
+    const coverBlob = await exportCanvasBlob({ width: 1080, height: 1080 });
     if (!coverBlob) {
       alert("Could not prepare cover image.");
       return;
     }
 
     const formData = new FormData();
-    formData.append("cover", coverBlob, "cover.png");
+    formData.append("cover", coverBlob, "cover.jpg");
     formData.append("audioUrl", uploadedAudioUrl);
     formData.append("clipStart", String(clipStart));
     formData.append("clipDuration", String(clipDuration));
