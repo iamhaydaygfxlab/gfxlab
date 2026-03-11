@@ -14,6 +14,7 @@ import {
   Transformer,
 } from "react-konva";
 import { getAuth, signOut } from "firebase/auth";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   addDoc,
   collection,
@@ -25,7 +26,6 @@ import {
 import { app, db } from "@/lib/firebase";
 import { cutoutPersonToPngDataUrl } from "@/lib/cutout";
 import AssetLibrary, { type AssetItem } from "./AssetLibrary";
-
 import FontPanel from "./FontPanel";
 import ImagePanel, { type ImageAdjustments } from "./ImagePanel";
 import LayersPanel from "./LayersPanel";
@@ -37,7 +37,7 @@ async function ensureFontLoaded(fontFamily: string) {
   if (!fontFamily) return;
   const fonts = (document as any).fonts;
   if (!fonts?.load) return;
-  await fonts.load(`24px \"${fontFamily}\"`);
+  await fonts.load(`24px "${fontFamily}"`);
   await fonts.ready;
 }
 
@@ -126,8 +126,6 @@ export function loadHtmlImage(src: string): Promise<HTMLImageElement> {
     img.src = src;
   });
 }
-
-
 
 function defaultAdj(): ImageAdjustments {
   return {
@@ -240,7 +238,9 @@ function arcPath(radius: number, arcDeg: number, reverse: boolean) {
   const y2 = r * Math.sin(end);
   const largeArcFlag = a > 180 ? 1 : 0;
   const sweepFlag = reverse ? 0 : 1;
-  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(
+    2
+  )} 0 ${largeArcFlag} ${sweepFlag} ${x2.toFixed(2)} ${y2.toFixed(2)}`;
 }
 
 function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number }) {
@@ -265,7 +265,13 @@ const FLYER_PRESETS: SizePreset[] = [
   { id: "fly-1080x1350", label: "1080 × 1350 (IG Portrait)", w: 1080, h: 1350 },
   { id: "fly-1080x1080", label: "1080 × 1080 (Square)", w: 1080, h: 1080 },
   { id: "fly-1080x1920", label: "1080 × 1920 (Story)", w: 1080, h: 1920 },
-  { id: "fly-letter", label: "2550 × 3300 (8.5×11 @300dpi)", w: 2550, h: 3300, dpiLabel: "Print" },
+  {
+    id: "fly-letter",
+    label: "2550 × 3300 (8.5×11 @300dpi)",
+    w: 2550,
+    h: 3300,
+    dpiLabel: "Print",
+  },
 ];
 
 const SOCIAL_PRESETS: SizePreset[] = [
@@ -321,6 +327,7 @@ async function deletePendingDesign(key: string) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 async function savePendingMusicExport(data: {
   audioBlob: Blob;
   fileName: string;
@@ -344,6 +351,7 @@ async function loadPendingMusicExport(): Promise<{
 async function deletePendingMusicExport() {
   await deletePendingDesign("gfxlab_pending_music_export");
 }
+
 export default function GfxEditor() {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
@@ -354,9 +362,19 @@ export default function GfxEditor() {
   const [projectName, setProjectName] = useState("Untitled Design");
   const [saving, setSaving] = useState(false);
   const [projectType, setProjectType] = useState<ProjectType>("cover");
-  const presets = projectType === "cover" ? COVER_PRESETS : projectType === "flyer" ? FLYER_PRESETS : SOCIAL_PRESETS;
+
+  const presets =
+    projectType === "cover"
+      ? COVER_PRESETS
+      : projectType === "flyer"
+      ? FLYER_PRESETS
+      : SOCIAL_PRESETS;
+
   const [presetId, setPresetId] = useState<string>(presets[0].id);
-  const preset = useMemo(() => ALL_PRESETS.find((x) => x.id === presetId) ?? presets[0], [presetId, presets]);
+  const preset = useMemo(
+    () => ALL_PRESETS.find((x) => x.id === presetId) ?? presets[0],
+    [presetId, presets]
+  );
 
   const [items, setItems] = useState<Item[]>([defaultText()]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -401,6 +419,7 @@ export default function GfxEditor() {
   >(null);
 
   const isMobile = typeof window !== "undefined" ? window.innerWidth <= 768 : false;
+
   const sheetHeight =
     tab === "assets"
       ? isMobile
@@ -418,34 +437,35 @@ export default function GfxEditor() {
       ? isMobile
         ? "min(360px, 42vh)"
         : "min(280px, 30vh)"
-     : tab === "export"
-? "min(420px, 48vh)"
-: "min(360px, 48vh)";
+      : tab === "export"
+      ? "min(420px, 48vh)"
+      : "min(360px, 48vh)";
 
   const panelReserve =
-  tab !== "none"
-    ? isMobile
-      ? 220
-      : 150
-    : isMobile
-    ? 24
-    : 0;
+    tab !== "none" ? (isMobile ? 220 : 150) : isMobile ? 24 : 0;
+
   const workspacePadding = isMobile ? 16 : 26;
   const artboardPadding = isMobile ? 26 : 40;
 
   const view = useMemo(() => {
     const safeW = Math.max(260, hostSize.w - workspacePadding * 2);
     const safeH = Math.max(260, hostSize.h - workspacePadding * 2 - panelReserve);
-    const ratio = Math.min((safeW - artboardPadding * 2) / preset.w, (safeH - artboardPadding * 2) / preset.h);
+    const ratio = Math.min(
+      (safeW - artboardPadding * 2) / preset.w,
+      (safeH - artboardPadding * 2) / preset.h
+    );
     const scaledRatio = Math.max(0.02, ratio);
     const w = Math.max(120, Math.round(preset.w * scaledRatio));
     const h = Math.max(120, Math.round(preset.h * scaledRatio));
     const x = Math.round((hostSize.w - w) / 2);
-   const y = workspacePadding + 10;
+    const y = workspacePadding + 10;
     return { w, h, ratio: scaledRatio, x, y };
   }, [hostSize, panelReserve, preset, workspacePadding, artboardPadding]);
 
-  const selectedItem = useMemo(() => items.find((i) => i.id === selectedId) ?? null, [items, selectedId]);
+  const selectedItem = useMemo(
+    () => items.find((i) => i.id === selectedId) ?? null,
+    [items, selectedId]
+  );
   const selectedText = selectedItem?.kind === "text" ? selectedItem : null;
   const selectedImage = selectedItem?.kind === "image" ? selectedItem : null;
 
@@ -453,7 +473,11 @@ export default function GfxEditor() {
     return items.map((it) => {
       if (it.kind === "text") {
         const clean = it.text.replace(/\s+/g, " ").trim();
-        const label = clean.length ? (clean.length > 24 ? clean.slice(0, 24) + "…" : clean) : "Text";
+        const label = clean.length
+          ? clean.length > 24
+            ? clean.slice(0, 24) + "…"
+            : clean
+          : "Text";
         return { id: it.id, kind: "text" as const, label };
       }
       return { id: it.id, kind: "image" as const, label: "Image" };
@@ -464,10 +488,13 @@ export default function GfxEditor() {
     if (node) nodeMapRef.current[id] = node;
     else delete nodeMapRef.current[id];
   }, []);
-const [musicFile, setMusicFile] = useState<File | null>(null);
-const [musicUrl, setMusicUrl] = useState("");
-const [clipStart, setClipStart] = useState(0);
-const [clipDuration, setClipDuration] = useState(30);
+
+  const [musicFile, setMusicFile] = useState<File | null>(null);
+  const [musicUrl, setMusicUrl] = useState("");
+  const [clipStart, setClipStart] = useState(0);
+  const [clipDuration, setClipDuration] = useState(30);
+  const [uploadedAudioUrl, setUploadedAudioUrl] = useState("");
+
   function snapshotNow(): Snapshot {
     return {
       items: JSON.parse(JSON.stringify(items)),
@@ -525,6 +552,7 @@ const [clipDuration, setClipDuration] = useState(30);
         setPaid(false);
         return;
       }
+
       const userRef = doc(db, "users", user.uid);
       const unsubDoc = onSnapshot(
         userRef,
@@ -534,8 +562,10 @@ const [clipDuration, setClipDuration] = useState(30);
         },
         () => setPaid(false)
       );
+
       return () => unsubDoc();
     });
+
     return () => unsubAuth();
   }, []);
 
@@ -547,20 +577,28 @@ const [clipDuration, setClipDuration] = useState(30);
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       if (e.key === "Shift") shiftDownRef.current = true;
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
         e.preventDefault();
         undo();
       }
-      if ((e.ctrlKey || e.metaKey) && ((e.key.toLowerCase() === "y") || (e.key.toLowerCase() === "z" && e.shiftKey))) {
+
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))
+      ) {
         e.preventDefault();
         redo();
       }
     };
+
     const onUp = (e: KeyboardEvent) => {
       if (e.key === "Shift") shiftDownRef.current = false;
     };
+
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
+
     return () => {
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
@@ -570,10 +608,12 @@ const [clipDuration, setClipDuration] = useState(30);
   useEffect(() => {
     const el = canvasHostRef.current;
     if (!el) return;
+
     const ro = new ResizeObserver((entries) => {
       const r = entries[0].contentRect;
       setHostSize({ w: Math.round(r.width), h: Math.round(r.height) });
     });
+
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -589,6 +629,7 @@ const [clipDuration, setClipDuration] = useState(30);
     loadHtmlImage(WATERMARK_SRC)
       .then((img) => !cancelled && setWmImg(img))
       .catch(() => !cancelled && setWmImg(null));
+
     return () => {
       cancelled = true;
     };
@@ -596,92 +637,98 @@ const [clipDuration, setClipDuration] = useState(30);
 
   useEffect(() => {
     let cancelled = false;
+
     if (!bgSrc) {
       setBgImg(null);
       return;
     }
+
     loadHtmlImage(bgSrc)
       .then((img) => !cancelled && setBgImg(img))
       .catch(() => !cancelled && setBgImg(null));
+
     return () => {
       cancelled = true;
     };
   }, [bgSrc]);
 
-useEffect(() => {
-  const tr = trRef.current;
-  if (!tr) return;
+  useEffect(() => {
+    const tr = trRef.current;
+    if (!tr) return;
 
-  if (!selectedId) {
-    tr.nodes([]);
-    tr.getLayer()?.batchDraw();
-    return;
-  }
-
-  const node = nodeMapRef.current[selectedId];
-
-  if (!node || nodeIsGone(node)) {
-    tr.nodes([]);
-    tr.getLayer()?.batchDraw();
-    return;
-  }
-
-  tr.nodes([node]);
-  tr.forceUpdate();
-  tr.getLayer()?.batchDraw();
-}, [selectedId, items]);
-useEffect(() => {
-  if (typeof window === "undefined") return;
-
-  const run = async () => {
-    const params = new URLSearchParams(window.location.search);
-    const exportStatus = params.get("export");
-    const sessionId = params.get("session_id");
-
-    if (!exportStatus) return;
-
-    if (!sessionId) {
-      console.error("Missing session_id in return URL");
-      window.history.replaceState({}, "", "/editor");
+    if (!selectedId) {
+      tr.nodes([]);
+      tr.getLayer()?.batchDraw();
       return;
     }
 
-    try {
-      const res = await fetch("/api/stripe/verify-session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ sessionId }),
-      });
+    const node = nodeMapRef.current[selectedId];
 
-      const data = await res.json();
+    if (!node || nodeIsGone(node)) {
+      tr.nodes([]);
+      tr.getLayer()?.batchDraw();
+      return;
+    }
 
-      if (!res.ok || !data?.ok || !data?.paid) {
-        console.error("Stripe session verification failed:", data);
+    tr.nodes([node]);
+    tr.forceUpdate();
+    tr.getLayer()?.batchDraw();
+  }, [selectedId, items]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const run = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const exportStatus = params.get("export");
+      const sessionId = params.get("session_id");
+
+      if (!exportStatus) return;
+
+      if (!sessionId) {
+        console.error("Missing session_id in return URL");
         window.history.replaceState({}, "", "/editor");
         return;
       }
 
-      if (exportStatus === "success") {
-        sessionStorage.setItem("paid_export", "true");
+      try {
+        const res = await fetch("/api/stripe/verify-session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ sessionId }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data?.ok || !data?.paid) {
+          console.error("Stripe session verification failed:", data);
+          window.history.replaceState({}, "", "/editor");
+          return;
+        }
+
+        if (exportStatus === "success") {
+          sessionStorage.setItem("paid_export", "true");
+        }
+
+        if (exportStatus === "music-success") {
+          sessionStorage.setItem("paid_music_export", "true");
+        }
+
+        window.history.replaceState({}, "", "/editor");
+      } catch (err) {
+        console.error("Stripe verification error:", err);
+        window.history.replaceState({}, "", "/editor");
       }
+    };
 
-      if (exportStatus === "music-success") {
-        sessionStorage.setItem("paid_music_export", "true");
-      }
+    run();
+  }, []);
 
-      window.history.replaceState({}, "", "/editor");
-    } catch (err) {
-      console.error("Stripe verification error:", err);
-      window.history.replaceState({}, "", "/editor");
-    }
-  };
-
-  run();
-}, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
+
     (async () => {
       try {
         const parsed = await loadPendingDesign<any>("gfxlab_pending_export_design");
@@ -689,10 +736,12 @@ useEffect(() => {
           setCheckoutRestoreReady(true);
           return;
         }
+
         if (parsed?.items) setItems(parsed.items);
         if (typeof parsed?.bgSrc !== "undefined") setBgSrc(parsed.bgSrc);
         if (parsed?.projectType) setProjectType(parsed.projectType);
         if (parsed?.presetId) setPresetId(parsed.presetId);
+
         window.setTimeout(() => setCheckoutRestoreReady(true), 700);
       } catch {
         setCheckoutRestoreReady(true);
@@ -701,77 +750,99 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-  if (typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
 
-  (async () => {
-    try {
-      const pendingMusic = await loadPendingMusicExport();
-      if (!pendingMusic) return;
+    (async () => {
+      try {
+        const pendingMusic = await loadPendingMusicExport();
+        if (!pendingMusic) return;
 
-      const restoredFile = new File(
-        [pendingMusic.audioBlob],
-        pendingMusic.fileName,
-        { type: pendingMusic.fileType }
-      );
+        const restoredFile = new File([pendingMusic.audioBlob], pendingMusic.fileName, {
+          type: pendingMusic.fileType,
+        });
 
-      const restoredUrl = URL.createObjectURL(restoredFile);
+        const restoredUrl = URL.createObjectURL(restoredFile);
 
-      setMusicFile(restoredFile);
-      setMusicUrl(restoredUrl);
-      setClipStart(pendingMusic.clipStart);
-      setClipDuration(pendingMusic.clipDuration);
-    } catch (err) {
-      console.error("Could not restore pending music export:", err);
-    }
-  })();
-}, []);
+        setMusicFile(restoredFile);
+        setMusicUrl(restoredUrl);
+        setClipStart(pendingMusic.clipStart);
+        setClipDuration(pendingMusic.clipDuration);
+
+        const storedAudioUrl = sessionStorage.getItem("pending_uploaded_audio_url") || "";
+        if (storedAudioUrl) {
+          setUploadedAudioUrl(storedAudioUrl);
+        }
+      } catch (err) {
+        console.error("Could not restore pending music export:", err);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
-  if (typeof window === "undefined") return;
-  if (!checkoutRestoreReady) return;
+    if (typeof window === "undefined") return;
+    if (!checkoutRestoreReady) return;
 
-  const paidExport = sessionStorage.getItem("paid_export");
-  const paidMusicExport = sessionStorage.getItem("paid_music_export");
+    const paidExport = sessionStorage.getItem("paid_export");
+    const paidMusicExport = sessionStorage.getItem("paid_music_export");
 
-  if (paidExport !== "true" && paidMusicExport !== "true") return;
+    if (paidExport !== "true" && paidMusicExport !== "true") return;
 
-  const t = window.setTimeout(async () => {
-    if (paidExport === "true") {
-      await exportPNG();
-      sessionStorage.removeItem("paid_export");
-      await deletePendingDesign("gfxlab_pending_export_design");
-      return;
-    }
+    const t = window.setTimeout(async () => {
+      if (paidExport === "true") {
+        await exportPNG();
+        sessionStorage.removeItem("paid_export");
+        await deletePendingDesign("gfxlab_pending_export_design");
+        return;
+      }
 
- if (paidMusicExport === "true") {
-  await exportBundleFiles();
-  sessionStorage.removeItem("paid_music_export");
-  sessionStorage.removeItem("pending_music_export");
-  await deletePendingDesign("gfxlab_pending_export_design");
-  await deletePendingMusicExport();
-}
-  }, 1200);
+      if (paidMusicExport === "true") {
+        await exportBundleFiles();
+        sessionStorage.removeItem("paid_music_export");
+        sessionStorage.removeItem("pending_music_export");
+        await deletePendingDesign("gfxlab_pending_export_design");
+        await deletePendingMusicExport();
+      }
+    }, 1200);
 
-  return () => window.clearTimeout(t);
-}, [checkoutRestoreReady, bgImg, presetId, projectType, musicFile, clipStart, clipDuration]);
+    return () => window.clearTimeout(t);
+  }, [checkoutRestoreReady, bgImg, presetId, projectType, musicFile, clipStart, clipDuration]);
+
   function toSafeSrc(src: string) {
     if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) return src;
+
     if (src.startsWith("http://") || src.startsWith("https://")) {
       const params = new URLSearchParams({ url: src });
       return `/api/image-proxy?${params.toString()}`;
     }
+
     return src;
   }
 
   function updateItem(id: string, patch: Partial<Item>) {
-    setItems((prev) => prev.map((i) => (i.id === id ? ({ ...i, ...patch } as Item) : i)));
+    setItems((prev: Item[]) => prev.map((i) => (i.id === id ? ({ ...i, ...patch } as Item) : i)));
   }
-function handleMusicChange(file: File | null, url: string, start: number, duration: number) {
-  if (file) setMusicFile(file);
-  setMusicUrl(url);
-  setClipStart(start);
-  setClipDuration(duration);
-}
+
+  function handleMusicChange(file: File | null, url: string, start: number, duration: number) {
+    if (file) setMusicFile(file);
+    setMusicUrl(url);
+    setClipStart(start);
+    setClipDuration(duration);
+  }
+
+  async function uploadMusicToFirebase(file: File): Promise<string> {
+    const storage = getStorage(app);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `music-exports/${Date.now()}-${safeName}`;
+    const storageRef = ref(storage, filePath);
+
+    await uploadBytes(storageRef, file, {
+      contentType: file.type || "audio/mpeg",
+    });
+
+    const downloadUrl = await getDownloadURL(storageRef);
+    return downloadUrl;
+  }
+
   function updateSelectedText(next: Partial<TextItem>) {
     if (!selectedText) return;
     updateItem(selectedText.id, { ...selectedText, ...next });
@@ -792,7 +863,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
     t.text = "New Text";
     t.x = Math.round(preset.w * 0.2);
     t.y = Math.round(preset.h * 0.2);
-    setItems((prev) => [...prev, t]);
+    setItems((prev: Item[]) => [...prev, t]);
     setSelectedId(t.id);
     setTab("text");
   }
@@ -802,29 +873,33 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
       const safeSrc = toSafeSrc(asset.src);
       const img = await loadHtmlImage(safeSrc);
       const isBackground = asset.type === "background";
+
       if (isBackground) {
         setBgSrc(safeSrc);
         setSelectedId(null);
         return;
       }
+
       const targetMaxW = Math.round(preset.w * 0.85);
       const targetMaxH = Math.round(preset.h * 0.85);
       const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
       const w = Math.max(60, Math.round(img.width * ratio));
       const h = Math.max(60, Math.round(img.height * ratio));
-     const imgItem: ImageItem = {
-  id: uid(),
-  kind: "image",
-  x: Math.round((preset.w - w) / 2),
-  y: Math.round((preset.h - h) / 2),
-  rotation: 0,
-  src: safeSrc,
-  width: w,
-  height: h,
-  scale: 1,
-  adj: defaultAdj(),
-};
-      setItems((prev) => [...prev, imgItem]);
+
+      const imgItem: ImageItem = {
+        id: uid(),
+        kind: "image",
+        x: Math.round((preset.w - w) / 2),
+        y: Math.round((preset.h - h) / 2),
+        rotation: 0,
+        src: safeSrc,
+        width: w,
+        height: h,
+        scale: 1,
+        adj: defaultAdj(),
+      };
+
+      setItems((prev: Item[]) => [...prev, imgItem]);
       setSelectedId(imgItem.id);
       setTab("adjust");
     } catch (e) {
@@ -835,6 +910,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
 
   async function addImageFromFile(file: File) {
     const reader = new FileReader();
+
     reader.onload = async () => {
       try {
         const src = String(reader.result);
@@ -844,19 +920,21 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
         const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
         const w = Math.max(60, Math.round(img.width * ratio));
         const h = Math.max(60, Math.round(img.height * ratio));
+
         const imgItem: ImageItem = {
-  id: uid(),
-  kind: "image",
-  x: Math.round((preset.w - w) / 2),
-  y: Math.round((preset.h - h) / 2),
-  rotation: 0,
-  src,
-  width: w,
-  height: h,
-  scale: 1,
-  adj: defaultAdj(),
-};
-        setItems((prev) => [...prev, imgItem]);
+          id: uid(),
+          kind: "image",
+          x: Math.round((preset.w - w) / 2),
+          y: Math.round((preset.h - h) / 2),
+          rotation: 0,
+          src,
+          width: w,
+          height: h,
+          scale: 1,
+          adj: defaultAdj(),
+        };
+
+        setItems((prev: Item[]) => [...prev, imgItem]);
         setSelectedId(imgItem.id);
         setTab("adjust");
       } catch (err) {
@@ -864,6 +942,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
         alert("Could not load that image.");
       }
     };
+
     reader.readAsDataURL(file);
   }
 
@@ -883,19 +962,21 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
       const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
       const w = Math.max(60, Math.round(img.width * ratio));
       const h = Math.max(60, Math.round(img.height * ratio));
-     const imgItem: ImageItem = {
-  id: uid(),
-  kind: "image",
-  x: Math.round((preset.w - w) / 2),
-  y: Math.round((preset.h - h) / 2),
-  rotation: 0,
-  src: pngDataUrl,
-  width: w,
-  height: h,
-  scale: 1,
-  adj: defaultAdj(),
-};
-      setItems((prev) => [...prev, imgItem]);
+
+      const imgItem: ImageItem = {
+        id: uid(),
+        kind: "image",
+        x: Math.round((preset.w - w) / 2),
+        y: Math.round((preset.h - h) / 2),
+        rotation: 0,
+        src: pngDataUrl,
+        width: w,
+        height: h,
+        scale: 1,
+        adj: defaultAdj(),
+      };
+
+      setItems((prev: Item[]) => [...prev, imgItem]);
       setSelectedId(imgItem.id);
       setTab("adjust");
     } catch (err) {
@@ -910,7 +991,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
     if (!selectedId) return;
     trRef.current?.nodes([]);
     trRef.current?.getLayer()?.batchDraw();
-    setItems((prev) => prev.filter((i) => i.id !== selectedId));
+    setItems((prev: Item[]) => prev.filter((i) => i.id !== selectedId));
     setSelectedId(null);
   }
 
@@ -918,8 +999,9 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
     if (!selectedId) return;
     const current = items.find((i) => i.id === selectedId);
     if (!current) return;
+
     const copy = { ...current, id: uid(), x: current.x + 40, y: current.y + 40 } as Item;
-    setItems((prev) => [...prev, copy]);
+    setItems((prev: Item[]) => [...prev, copy]);
     setSelectedId(copy.id);
   }
 
@@ -938,6 +1020,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
     if (!selectedId) return;
     const current = items.find((i) => i.id === selectedId);
     if (!current) return;
+
     if (current.kind === "text") updateItem(current.id, { y: Math.round(preset.h / 2 - 30) });
     else updateItem(current.id, { y: Math.round((preset.h - current.height) / 2) });
   }
@@ -951,12 +1034,13 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
     if (!selectedId) return;
     const current = items.find((i) => i.id === selectedId);
     if (!current) return;
+
     if (current.kind === "text") updateItem(current.id, { y: Math.round(preset.h - 100) });
     else updateItem(current.id, { y: Math.round(preset.h - current.height - 20) });
   }
 
   function moveLayerUp(id: string) {
-    setItems((prev) => {
+    setItems((prev: Item[]) => {
       const i = prev.findIndex((x) => x.id === id);
       if (i === -1 || i === prev.length - 1) return prev;
       const next = [...prev];
@@ -967,7 +1051,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
   }
 
   function moveLayerDown(id: string) {
-    setItems((prev) => {
+    setItems((prev: Item[]) => {
       const i = prev.findIndex((x) => x.id === id);
       if (i <= 0) return prev;
       const next = [...prev];
@@ -978,7 +1062,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
   }
 
   function bringToFront(id: string) {
-    setItems((prev) => {
+    setItems((prev: Item[]) => {
       const i = prev.findIndex((x) => x.id === id);
       if (i === -1 || i === prev.length - 1) return prev;
       const next = [...prev];
@@ -989,7 +1073,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
   }
 
   function sendToBack(id: string) {
-    setItems((prev) => {
+    setItems((prev: Item[]) => {
       const i = prev.findIndex((x) => x.id === id);
       if (i <= 0) return prev;
       const next = [...prev];
@@ -1024,6 +1108,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
     try {
       const auth = getAuth(app);
       let user = auth.currentUser;
+
       if (!user) {
         await new Promise<void>((resolve) => {
           const unsub = auth.onAuthStateChanged((u) => {
@@ -1033,13 +1118,16 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
           });
         });
       }
+
       if (!user) {
         window.location.href = "/login";
         return;
       }
+
       const params = new URLSearchParams();
       params.set("uid", user.uid);
       if (user.email) params.set("email", user.email);
+
       window.location.href = `/api/stripe/checkout-pro?${params.toString()}`;
     } catch {
       window.location.href = "/login";
@@ -1050,11 +1138,14 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
     try {
       const auth = getAuth(app);
       const user = auth.currentUser;
+
       if (!user) {
         alert("You must be signed in to save designs.");
         return;
       }
+
       setSaving(true);
+
       const payload = {
         ownerUid: user.uid,
         name: projectName,
@@ -1064,10 +1155,12 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
         items,
         updatedAt: serverTimestamp(),
       };
+
       const created = await addDoc(collection(db, "projects"), {
         ...payload,
         createdAt: serverTimestamp(),
       });
+
       setProjectId(created.id);
     } catch (err: any) {
       console.error("Save project failed:", err);
@@ -1080,6 +1173,7 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
   async function makeAiBackground() {
     const idea = window.prompt("Describe your background");
     if (!idea) return;
+
     try {
       const size = preset.w >= preset.h ? "1536x1024" : "1024x1536";
       const res = await fetch("/api/ai/background", {
@@ -1087,31 +1181,37 @@ function handleMusicChange(file: File | null, url: string, start: number, durati
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: idea, size }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "AI failed");
+
       const url = data?.image || data?.dataUrl;
       if (!url) throw new Error("No image returned");
+
       setBgSrc(url);
     } catch (e: any) {
       alert(e?.message || "AI failed");
     }
   }
 
-function deselect(e: any) {
-  const stage = stageRef.current;
-  if (!stage) return;
+  function deselect(e: any) {
+    const stage = stageRef.current;
+    if (!stage) return;
 
-  const clickedOnStage = e.target === stage;
-  if (clickedOnStage) {
-    setSelectedId(null);
+    const clickedOnStage = e.target === stage;
+    if (clickedOnStage) {
+      setSelectedId(null);
+    }
   }
-}
+
   function applySnapping(node: Konva.Node | null) {
     if (!node) return;
+
     if (!snapEnabled || shiftDownRef.current) {
       setGuides([]);
       return;
     }
+
     if (nodeIsGone(node)) {
       setGuides([]);
       return;
@@ -1123,6 +1223,7 @@ function deselect(e: any) {
     const artTop = view.y;
     const stageW = view.w;
     const stageH = view.h;
+
     const vTargets: number[] = [artLeft, artLeft + stageW / 2, artLeft + stageW];
     const hTargets: number[] = [artTop, artTop + stageH / 2, artTop + stageH];
 
@@ -1141,8 +1242,10 @@ function deselect(e: any) {
 
     const vChecks = [{ val: vb.x }, { val: vb.cx }, { val: vb.r }];
     const hChecks = [{ val: vb.y }, { val: vb.cy }, { val: vb.b }];
+
     let bestVDiff = Infinity;
     let bestVTarget: number | null = null;
+
     for (const c of vChecks) {
       for (const t of vTargets) {
         const diff = t - c.val;
@@ -1152,8 +1255,10 @@ function deselect(e: any) {
         }
       }
     }
+
     let bestHDiff = Infinity;
     let bestHTarget: number | null = null;
+
     for (const c of hChecks) {
       for (const t of hTargets) {
         const diff = t - c.val;
@@ -1163,14 +1268,17 @@ function deselect(e: any) {
         }
       }
     }
+
     if (bestVTarget != null && bestVDiff !== Infinity) {
       nx += bestVDiff;
       newGuides.push({ kind: "v", pos: bestVTarget });
     }
+
     if (bestHTarget != null && bestHDiff !== Infinity) {
       ny += bestHDiff;
       newGuides.push({ kind: "h", pos: bestHTarget });
     }
+
     node.position({ x: nx, y: ny });
     setGuides(newGuides);
   }
@@ -1194,6 +1302,7 @@ function deselect(e: any) {
       const nextH = Math.max(20, Math.round(current.height * scaleY));
       imageNode.scaleX(1);
       imageNode.scaleY(1);
+
       updateItem(current.id, {
         width: nextW,
         height: nextH,
@@ -1207,6 +1316,7 @@ function deselect(e: any) {
       const nextFont = Math.max(10, Math.round(current.fontSize * uniformScale));
       groupNode.scaleX(1);
       groupNode.scaleY(1);
+
       updateItem(current.id, {
         fontSize: nextFont,
         rotation: groupNode.rotation(),
@@ -1230,12 +1340,14 @@ function deselect(e: any) {
     const t1 = e.evt.touches?.[0];
     const t2 = e.evt.touches?.[1];
     if (!t1 || !t2) return;
+
     const p1 = { x: t1.clientX, y: t1.clientY };
     const p2 = { x: t2.clientX, y: t2.clientY };
     const center = getCenter(p1, p2);
     const dist = getDistance(p1, p2);
     const angle = getAngle(p1, p2);
     const node = selectedId ? nodeMapRef.current[selectedId] : null;
+
     if (node && !nodeIsGone(node)) {
       pinchRef.current = {
         mode: "node",
@@ -1251,6 +1363,7 @@ function deselect(e: any) {
       };
       return;
     }
+
     pinchRef.current = {
       mode: "stage",
       startDist: dist,
@@ -1270,6 +1383,7 @@ function deselect(e: any) {
     const t2 = e.evt.touches?.[1];
     const active = pinchRef.current;
     if (!t1 || !t2 || !active) return;
+
     e.evt.preventDefault();
 
     const p1 = { x: t1.clientX, y: t1.clientY };
@@ -1289,8 +1403,10 @@ function deselect(e: any) {
 
     const node = selectedId ? nodeMapRef.current[selectedId] : null;
     if (!node || nodeIsGone(node)) return;
+
     const nextScale = Math.max(0.25, Math.min(dist / active.startDist, 6));
     const rotationDelta = angle - active.startAngle;
+
     node.scale({
       x: active.startNodeScaleX * nextScale,
       y: active.startNodeScaleY * nextScale,
@@ -1303,86 +1419,87 @@ function deselect(e: any) {
     if (pinchRef.current?.mode === "node") commitSelectedNodeTouchTransform();
     pinchRef.current = null;
   }
-async function exportCanvasBlob(): Promise<Blob | null> {
-  const stage = stageRef.current;
-  if (!stage) return null;
 
-  setExporting(true);
-  await new Promise((resolve) => setTimeout(resolve, 120));
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-  );
+  async function exportCanvasBlob(): Promise<Blob | null> {
+    const stage = stageRef.current;
+    if (!stage) return null;
 
-  const oldScaleX = stage.scaleX();
-  const oldScaleY = stage.scaleY();
-  const oldX = stage.x();
-  const oldY = stage.y();
-  const oldDraggable = stage.draggable();
-
-  try {
-    stage.scale({ x: 1, y: 1 });
-    stage.position({ x: 0, y: 0 });
-    stage.draggable(false);
-    stage.batchDraw();
-
+    setExporting(true);
+    await new Promise((resolve) => setTimeout(resolve, 120));
     await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => resolve())
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     );
 
-    const dataUrl = stage.toDataURL({
-      x: view.x,
-      y: view.y,
-      width: view.w,
-      height: view.h,
-      pixelRatio: preset.w / view.w,
-      mimeType: "image/png",
-    });
+    const oldScaleX = stage.scaleX();
+    const oldScaleY = stage.scaleY();
+    const oldX = stage.x();
+    const oldY = stage.y();
+    const oldDraggable = stage.draggable();
 
-    const img = await loadHtmlImage(dataUrl);
-    const canvas = document.createElement("canvas");
-    canvas.width = preset.w;
-    canvas.height = preset.h;
+    try {
+      stage.scale({ x: 1, y: 1 });
+      stage.position({ x: 0, y: 0 });
+      stage.draggable(false);
+      stage.batchDraw();
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas context not available");
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-    ctx.clearRect(0, 0, preset.w, preset.h);
-    ctx.drawImage(img, 0, 0, preset.w, preset.h);
+      const dataUrl = stage.toDataURL({
+        x: view.x,
+        y: view.y,
+        width: view.w,
+        height: view.h,
+        pixelRatio: preset.w / view.w,
+        mimeType: "image/png",
+      });
 
-    const blob: Blob | null = await new Promise((resolve) =>
-      canvas.toBlob((b) => resolve(b), "image/png")
-    );
+      const img = await loadHtmlImage(dataUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = preset.w;
+      canvas.height = preset.h;
 
-    return blob;
-  } catch (err) {
-    console.error("Export blob failed:", err);
-    alert("Could not prepare image for video export.");
-    return null;
-  } finally {
-    stage.scale({ x: oldScaleX, y: oldScaleY });
-    stage.position({ x: oldX, y: oldY });
-    stage.draggable(oldDraggable);
-    stage.batchDraw();
-    setTimeout(() => setExporting(false), 80);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context not available");
+
+      ctx.clearRect(0, 0, preset.w, preset.h);
+      ctx.drawImage(img, 0, 0, preset.w, preset.h);
+
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/png")
+      );
+
+      return blob;
+    } catch (err) {
+      console.error("Export blob failed:", err);
+      alert("Could not prepare image for video export.");
+      return null;
+    } finally {
+      stage.scale({ x: oldScaleX, y: oldScaleY });
+      stage.position({ x: oldX, y: oldY });
+      stage.draggable(oldDraggable);
+      stage.batchDraw();
+      setTimeout(() => setExporting(false), 80);
+    }
   }
-}
-      async function testExportBlob() {
-  const blob = await exportCanvasBlob();
-  if (!blob) return;
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "test-cover.png";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
+  async function testExportBlob() {
+    const blob = await exportCanvasBlob();
+    if (!blob) return;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "test-cover.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
 async function exportVideoFile() {
   try {
-    if (!musicFile) {
-      alert("Please upload a music file first.");
+    if (!uploadedAudioUrl) {
+      alert("Audio upload is missing. Please try the music export again.");
       return;
     }
 
@@ -1394,7 +1511,7 @@ async function exportVideoFile() {
 
     const formData = new FormData();
     formData.append("cover", coverBlob, "cover.png");
-    formData.append("audio", musicFile);
+    formData.append("audioUrl", uploadedAudioUrl);
     formData.append("clipStart", String(clipStart));
     formData.append("clipDuration", String(clipDuration));
 
@@ -1425,29 +1542,31 @@ async function exportVideoFile() {
     alert("Something went wrong during video export.");
   }
 }
-async function exportBundleFiles() {
-  try {
-    if (!musicFile) {
-      alert("Please upload a music file first.");
-      return;
+  async function exportBundleFiles() {
+    try {
+      if (!musicFile) {
+        alert("Please upload a music file first.");
+        return;
+      }
+
+      await exportPNG();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      await exportVideoFile();
+    } catch (err) {
+      console.error(err);
+      alert("Bundle export failed.");
     }
-
-    await exportPNG();
-
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    await exportVideoFile();
-  } catch (err) {
-    console.error(err);
-    alert("Bundle export failed.");
   }
-}
+
   async function exportPNG() {
     const stage = stageRef.current;
     if (!stage) return;
+
     setExporting(true);
     await new Promise((resolve) => setTimeout(resolve, 120));
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
 
     const oldScaleX = stage.scaleX();
     const oldScaleY = stage.scaleY();
@@ -1460,6 +1579,7 @@ async function exportBundleFiles() {
       stage.position({ x: 0, y: 0 });
       stage.draggable(false);
       stage.batchDraw();
+
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
       const dataUrl = stage.toDataURL({
@@ -1475,14 +1595,23 @@ async function exportBundleFiles() {
       const canvas = document.createElement("canvas");
       canvas.width = preset.w;
       canvas.height = preset.h;
+
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas context not available");
+
       ctx.clearRect(0, 0, preset.w, preset.h);
       ctx.drawImage(img, 0, 0, preset.w, preset.h);
+
       const finalDataUrl = canvas.toDataURL("image/png");
       const a = document.createElement("a");
       a.href = finalDataUrl;
-      a.download = projectType === "cover" ? "gfxlab-cover.png" : projectType === "flyer" ? "gfxlab-flyer.png" : "gfxlab-social.png";
+      a.download =
+        projectType === "cover"
+          ? "gfxlab-cover.png"
+          : projectType === "flyer"
+          ? "gfxlab-flyer.png"
+          : "gfxlab-social.png";
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1500,53 +1629,76 @@ async function exportBundleFiles() {
 
   async function handleExport() {
     if (paid) {
-      exportPNG();
-
+      await exportPNG();
       return;
     }
+
     await saveCurrentDesignForCheckout();
-    const guestId = typeof window !== "undefined" ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID() : "";
-    if (typeof window !== "undefined" && guestId) localStorage.setItem("gfxlab_guest_id", guestId);
-    window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(guestId)}`;
-  }
-async function handleMusicExport() {
-  if (!musicFile) {
-    alert("Please upload a music file first.");
-    return;
-  }
 
-  await saveCurrentDesignForCheckout();
+    const guestId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+        : "";
 
-  await savePendingMusicExport({
-    audioBlob: musicFile,
-    fileName: musicFile.name,
-    fileType: musicFile.type || "audio/mpeg",
-    clipStart,
-    clipDuration,
-  });
+    if (typeof window !== "undefined" && guestId) {
+      localStorage.setItem("gfxlab_guest_id", guestId);
+    }
 
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem("pending_music_export", "true");
+    window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(
+      guestId
+    )}`;
   }
 
-  const guestId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-      : "";
+  async function handleMusicExport() {
+    if (!musicFile) {
+      alert("Please upload a music file first.");
+      return;
+    }
 
-  if (typeof window !== "undefined" && guestId) {
-    localStorage.setItem("gfxlab_guest_id", guestId);
+    const file: File = musicFile;
+
+    try {
+      const uploadedUrl = await uploadMusicToFirebase(file);
+      setUploadedAudioUrl(uploadedUrl);
+
+      await saveCurrentDesignForCheckout();
+
+      await savePendingMusicExport({
+        audioBlob: file,
+        fileName: file.name,
+        fileType: file.type || "audio/mpeg",
+        clipStart,
+        clipDuration,
+      });
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("pending_music_export", "true");
+        sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
+      }
+
+      const guestId =
+        typeof window !== "undefined"
+          ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+          : "";
+
+      if (typeof window !== "undefined" && guestId) {
+        localStorage.setItem("gfxlab_guest_id", guestId);
+      }
+
+      window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(
+        guestId
+      )}`;
+    } catch (err) {
+      console.error(err);
+      alert("Could not upload music file.");
+    }
   }
-
-  window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(
-    guestId
-  )}`;
-}
 
   function loadTemplate(template: FireTemplate) {
     setProjectType(template.type);
     setPresetId(template.presetId);
     setBgSrc(template.bgSrc);
+
     const mappedItems = template.items.map((item) =>
       makeTextItem({
         text: item.text,
@@ -1559,6 +1711,7 @@ async function handleMusicExport() {
         fill: item.fill,
       })
     );
+
     setItems(mappedItems);
     setSelectedId(mappedItems[0]?.id ?? null);
     setTab("text");
@@ -1575,6 +1728,7 @@ async function handleMusicExport() {
       fontWeight: 900,
       fill: "#ffffff",
     });
+
     const title = makeTextItem({
       text: "Album Title",
       x: Math.round(preset.w * 0.16),
@@ -1584,7 +1738,8 @@ async function handleMusicExport() {
       fontWeight: 700,
       fill: "#d1b15a",
     });
-    setItems((prev) => [...prev, artist, title]);
+
+    setItems((prev: Item[]) => [...prev, artist, title]);
     setSelectedId(title.id);
     setTab("text");
   }
@@ -1599,6 +1754,7 @@ async function handleMusicExport() {
       fontWeight: 900,
       fill: "#ffffff",
     });
+
     const sub = makeTextItem({
       text: "DJ KAY",
       x: Math.round(preset.w * 0.2),
@@ -1608,6 +1764,7 @@ async function handleMusicExport() {
       fontWeight: 800,
       fill: "#d1b15a",
     });
+
     const details = makeTextItem({
       text: "FRIDAY • 10PM • TACOMA",
       x: Math.round(preset.w * 0.14),
@@ -1617,7 +1774,8 @@ async function handleMusicExport() {
       fontWeight: 700,
       fill: "#ffffff",
     });
-    setItems((prev) => [...prev, headline, sub, details]);
+
+    setItems((prev: Item[]) => [...prev, headline, sub, details]);
     setSelectedId(headline.id);
     setTab("text");
   }
@@ -1633,6 +1791,7 @@ async function handleMusicExport() {
       fill: "#ffffff",
       align: "center",
     });
+
     const author = makeTextItem({
       text: "- @username",
       x: Math.round(preset.w * 0.28),
@@ -1642,7 +1801,8 @@ async function handleMusicExport() {
       fontWeight: 700,
       fill: "#d1b15a",
     });
-    setItems((prev) => [...prev, quote, author]);
+
+    setItems((prev: Item[]) => [...prev, quote, author]);
     setSelectedId(quote.id);
     setTab("text");
   }
@@ -1657,6 +1817,7 @@ async function handleMusicExport() {
       fontWeight: 900,
       fill: "#ffffff",
     });
+
     const episode = makeTextItem({
       text: "EPISODE 001",
       x: Math.round(preset.w * 0.12),
@@ -1666,13 +1827,15 @@ async function handleMusicExport() {
       fontWeight: 700,
       fill: "#d1b15a",
     });
-    setItems((prev) => [...prev, show, episode]);
+
+    setItems((prev: Item[]) => [...prev, show, episode]);
     setSelectedId(show.id);
     setTab("text");
   }
 
   function applyGlowText() {
     if (!selectedText) return;
+
     updateSelectedText({
       fill: "#ffffff",
       shadowEnabled: true,
@@ -1688,6 +1851,7 @@ async function handleMusicExport() {
 
   function applyNeonText() {
     if (!selectedText) return;
+
     updateSelectedText({
       fill: "#7df9ff",
       shadowEnabled: true,
@@ -1705,6 +1869,7 @@ async function handleMusicExport() {
 
   function applyGoldText() {
     if (!selectedText) return;
+
     updateSelectedText({
       fill: "#d1b15a",
       shadowEnabled: true,
@@ -1722,6 +1887,7 @@ async function handleMusicExport() {
 
   function applyHardShadowText() {
     if (!selectedText) return;
+
     updateSelectedText({
       fill: "#ffffff",
       shadowEnabled: true,
@@ -1737,6 +1903,7 @@ async function handleMusicExport() {
 
   function applyCleanTitleText() {
     if (!selectedText) return;
+
     updateSelectedText({
       fill: "#ffffff",
       shadowEnabled: false,
@@ -1751,38 +1918,41 @@ async function handleMusicExport() {
       style3d: "none",
     });
   }
-function applyHaydayEffect() {
-  if (!selectedImage) return;
 
-  updateItem(selectedImage.id, {
-    adj: {
-      ...selectedImage.adj,
-      brightness: -0.10,
-      exposure: 0.12,
-      contrast: -51,
-      saturation: -1.05,
-      hue: 0,
-      blur: 0,
-      hdr: 0.28,
-      texture: 0.39,
-      clarity: 0.89,
-      sharpen: 0.62,
-      vignette: 0,
-      grain: 0.12,
-      warmth: -0.1,
-      highlights: -0.4,
-      shadows: 0.15,
-      fade: 0.10,
-      denoise: 0.47,
-      curvePreset: "medium-contrast",
-    },
-  } as Partial<Item>);
-}
+  function applyHaydayEffect() {
+    if (!selectedImage) return;
+
+    updateItem(selectedImage.id, {
+      adj: {
+        ...selectedImage.adj,
+        brightness: -0.1,
+        exposure: 0.12,
+        contrast: -51,
+        saturation: -1.05,
+        hue: 0,
+        blur: 0,
+        hdr: 0.28,
+        texture: 0.39,
+        clarity: 0.89,
+        sharpen: 0.62,
+        vignette: 0,
+        grain: 0.12,
+        warmth: -0.1,
+        highlights: -0.4,
+        shadows: 0.15,
+        fade: 0.1,
+        denoise: 0.47,
+        curvePreset: "medium-contrast",
+      },
+    } as Partial<Item>);
+  }
+
   return (
     <div style={screen}>
       <div style={header}>
         <style jsx global>{`
-          html, body {
+          html,
+          body {
             touch-action: manipulation;
           }
           .sheetBody input,
@@ -1808,21 +1978,42 @@ function applyHaydayEffect() {
           <button style={iconBtn} onClick={() => window.history.back()} title="Back">
             ←
           </button>
-          <img src="/gfxlab-icon.png" alt="GFXlab" style={{ height: 40, width: 40, objectFit: "contain", flexShrink: 0 }} />
+          <img
+            src="/gfxlab-icon.png"
+            alt="GFXlab"
+            style={{ height: 40, width: 40, objectFit: "contain", flexShrink: 0 }}
+          />
           <button style={smallHeaderBtn} onClick={undo} disabled={historyIndexRef.current <= 0}>
             Undo
           </button>
-          <button style={smallHeaderBtn} onClick={redo} disabled={historyIndexRef.current >= historyRef.current.length - 1}>
+          <button
+            style={smallHeaderBtn}
+            onClick={redo}
+            disabled={historyIndexRef.current >= historyRef.current.length - 1}
+          >
             Redo
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flexShrink: 1 }}>
-          <select value={projectType} onChange={(e) => setProjectType(e.target.value as ProjectType)} style={miniSelect}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            minWidth: 0,
+            flexShrink: 1,
+          }}
+        >
+          <select
+            value={projectType}
+            onChange={(e) => setProjectType(e.target.value as ProjectType)}
+            style={miniSelect}
+          >
             <option value="cover">Cover</option>
             <option value="flyer">Flyer</option>
             <option value="social">Social</option>
           </select>
+
           {!paid ? (
             <button onClick={goToProCheckout} style={upgradeBtn} title="Upgrade to Pro">
               Upgrade
@@ -1848,11 +2039,6 @@ function applyHaydayEffect() {
 
       <div style={canvasArea}>
         <div ref={canvasHostRef} style={canvasWrap}>
-      
-
-
-
-          
           <Stage
             ref={stageRef as any}
             width={hostSize.w}
@@ -1861,27 +2047,29 @@ function applyHaydayEffect() {
             scaleY={stageScale}
             x={stagePos.x}
             y={stagePos.y}
-      draggable={false}
-       onMouseDown={(e) => {
-  if (e.target === e.target.getStage()) {
-    deselect(e);
-  }
-}}
-onTouchStart={(e) => {
-  if (e.evt.touches.length === 2) {
-    beginPinchGesture(e);
-    return;
-  }
+            draggable={false}
+            onMouseDown={(e) => {
+              if (e.target === e.target.getStage()) {
+                deselect(e);
+              }
+            }}
+            onTouchStart={(e) => {
+              if (e.evt.touches.length === 2) {
+                beginPinchGesture(e);
+                return;
+              }
 
-  if (e.evt.touches.length === 1 && e.target === e.target.getStage()) {
-    deselect(e);
-  }
-}}
+              if (e.evt.touches.length === 1 && e.target === e.target.getStage()) {
+                deselect(e);
+              }
+            }}
             onTouchMove={(e) => {
               if (e.evt.touches.length === 2) movePinchGesture(e);
             }}
             onTouchEnd={() => {
-              if ((pinchRef.current && pinchRef.current.mode) || !pinchRef.current) endPinchGesture();
+              if ((pinchRef.current && pinchRef.current.mode) || !pinchRef.current) {
+                endPinchGesture();
+              }
             }}
           >
             <Layer listening={false}>
@@ -1900,14 +2088,14 @@ onTouchStart={(e) => {
 
             <Layer>
               <Group
-  ref={artGroupRef as any}
-  x={view.x}
-  y={view.y}
-  clipX={0}
-  clipY={0}
-  clipWidth={view.w}
-  clipHeight={view.h}
->
+                ref={artGroupRef as any}
+                x={view.x}
+                y={view.y}
+                clipX={0}
+                clipY={0}
+                clipWidth={view.w}
+                clipHeight={view.h}
+              >
                 {bgImg ? (
                   <KImage image={bgImg} x={0} y={0} width={view.w} height={view.h} listening={false} />
                 ) : (
@@ -1927,18 +2115,18 @@ onTouchStart={(e) => {
                       registerNode={registerNode}
                     />
                   ) : (
-             <CanvasImageItem
-  key={it.id}
-  item={it}
-  ratio={view.ratio}
-  canvasW={view.w}
-  canvasH={view.h}
-  onSelect={setSelectedId}
-  onUpdate={updateItem}
-  onDragMove={(node) => applySnapping(node)}
-  onDragEnd={clearGuides}
-  registerNode={registerNode}
-/>
+                    <CanvasImageItem
+                      key={it.id}
+                      item={it}
+                      ratio={view.ratio}
+                      canvasW={view.w}
+                      canvasH={view.h}
+                      onSelect={setSelectedId}
+                      onUpdate={updateItem}
+                      onDragMove={(node) => applySnapping(node)}
+                      onDragEnd={clearGuides}
+                      registerNode={registerNode}
+                    />
                   )
                 )}
 
@@ -1996,12 +2184,7 @@ onTouchStart={(e) => {
                 <Transformer
                   ref={trRef}
                   rotateEnabled
-                  enabledAnchors={[
-                    "top-left",
-                    "top-right",
-                    "bottom-left",
-                    "bottom-right",
-                  ]}
+                  enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
                   boundBoxFunc={(oldBox, newBox) => {
                     if (newBox.width < 40 || newBox.height < 40) {
                       return oldBox;
@@ -2020,12 +2203,7 @@ onTouchStart={(e) => {
         <TabBtn label="Text" active={tab === "text"} onClick={() => setTab(tab === "text" ? "none" : "text")} />
         <TabBtn label="Adjust" active={tab === "adjust"} onClick={() => setTab(tab === "adjust" ? "none" : "adjust")} />
         <TabBtn label="Layers" active={tab === "layers"} onClick={() => setTab(tab === "layers" ? "none" : "layers")} />
-<TabBtn
-  label="Export"
-  active={tab === "export"}
-  onClick={() => setTab(tab === "export" ? "none" : "export")}
-/>
-         
+        <TabBtn label="Export" active={tab === "export"} onClick={() => setTab(tab === "export" ? "none" : "export")} />
       </div>
 
       {tab !== "none" && (
@@ -2147,21 +2325,39 @@ onTouchStart={(e) => {
                   <div style={{ padding: "0 12px 12px" }}>
                     <div style={{ fontWeight: 900, marginBottom: 8 }}>Text Templates</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
-                      <button style={tileBtn} onClick={addArtistTemplate}>Artist + Title</button>
-                      <button style={tileBtn} onClick={addFlyerTemplate}>Event Flyer</button>
-                      <button style={tileBtn} onClick={addQuoteTemplate}>Social Quote</button>
-                      <button style={tileBtn} onClick={addPodcastTemplate}>Podcast Cover</button>
+                      <button style={tileBtn} onClick={addArtistTemplate}>
+                        Artist + Title
+                      </button>
+                      <button style={tileBtn} onClick={addFlyerTemplate}>
+                        Event Flyer
+                      </button>
+                      <button style={tileBtn} onClick={addQuoteTemplate}>
+                        Social Quote
+                      </button>
+                      <button style={tileBtn} onClick={addPodcastTemplate}>
+                        Podcast Cover
+                      </button>
                     </div>
                   </div>
 
                   <div style={{ padding: "0 12px 12px" }}>
                     <div style={{ fontWeight: 900, marginBottom: 8 }}>Text Effects</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      <button style={templateBtn} onClick={applyGlowText} disabled={!selectedText}>Glow</button>
-                      <button style={templateBtn} onClick={applyNeonText} disabled={!selectedText}>Neon</button>
-                      <button style={templateBtn} onClick={applyGoldText} disabled={!selectedText}>Gold</button>
-                      <button style={templateBtn} onClick={applyHardShadowText} disabled={!selectedText}>Hard Shadow</button>
-                      <button style={templateBtn} onClick={applyCleanTitleText} disabled={!selectedText}>Clean Title</button>
+                      <button style={templateBtn} onClick={applyGlowText} disabled={!selectedText}>
+                        Glow
+                      </button>
+                      <button style={templateBtn} onClick={applyNeonText} disabled={!selectedText}>
+                        Neon
+                      </button>
+                      <button style={templateBtn} onClick={applyGoldText} disabled={!selectedText}>
+                        Gold
+                      </button>
+                      <button style={templateBtn} onClick={applyHardShadowText} disabled={!selectedText}>
+                        Hard Shadow
+                      </button>
+                      <button style={templateBtn} onClick={applyCleanTitleText} disabled={!selectedText}>
+                        Clean Title
+                      </button>
                     </div>
                   </div>
 
@@ -2211,54 +2407,61 @@ onTouchStart={(e) => {
                 <>
                   <div style={rowOne}>
                     <label style={checkRow}>
-                      <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={snapEnabled}
+                        onChange={(e) => setSnapEnabled(e.target.checked)}
+                      />
                       <span>Snap</span>
                     </label>
-                    <div style={{ fontSize: 12, opacity: 0.7, padding: 12 }}>Hold Shift to drag free. Use two fingers on the selected layer to scale/rotate.</div>
+                    <div style={{ fontSize: 12, opacity: 0.7, padding: 12 }}>
+                      Hold Shift to drag free. Use two fingers on the selected layer to
+                      scale/rotate.
+                    </div>
                   </div>
-                 {selectedImage ? (
-  <>
-    <div style={{ padding: "0 12px 12px" }}>
-      <div style={{ fontWeight: 900, marginBottom: 8 }}>Scale</div>
 
-      <input
-        type="range"
-        min="0.2"
-        max="6"
-        step="0.01"
-        value={selectedImage.scale ?? 1}
-        onChange={(e) =>
-          updateItem(selectedImage.id, {
-            scale: Number(e.target.value),
-          } as Partial<Item>)
-        }
-        style={{ width: "100%" }}
-      />
+                  {selectedImage ? (
+                    <>
+                      <div style={{ padding: "0 12px 12px" }}>
+                        <div style={{ fontWeight: 900, marginBottom: 8 }}>Scale</div>
 
-      <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-        {Math.round((selectedImage.scale ?? 1) * 100)}%
-      </div>
-    </div>
-<div style={{ padding: "0 12px 12px" }}>
-  <button
-    style={btnTile}
-    onClick={applyHaydayEffect}
-    disabled={!selectedImage}
-  >
-    THE HAYDAY EFFECT
-  </button>
-</div>
-    <ImagePanel
-      value={selectedImage.adj}
-      onChange={updateSelectedImage}
-      onReset={resetSelectedImageAdjustments}
-    />
-  </>
-) : (
-  <div style={hint}>Select an image layer to adjust it.</div>
-)}
+                        <input
+                          type="range"
+                          min="0.2"
+                          max="6"
+                          step="0.01"
+                          value={selectedImage.scale ?? 1}
+                          onChange={(e) =>
+                            updateItem(selectedImage.id, {
+                              scale: Number(e.target.value),
+                            } as Partial<Item>)
+                          }
+                          style={{ width: "100%" }}
+                        />
+
+                        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+                          {Math.round((selectedImage.scale ?? 1) * 100)}%
+                        </div>
+                      </div>
+
+                      <div style={{ padding: "0 12px 12px" }}>
+                        <button style={btnTile} onClick={applyHaydayEffect} disabled={!selectedImage}>
+                          THE HAYDAY EFFECT
+                        </button>
+                      </div>
+
+                      <ImagePanel
+                        value={selectedImage.adj}
+                        onChange={updateSelectedImage}
+                        onReset={resetSelectedImageAdjustments}
+                      />
+                    </>
+                  ) : (
+                    <div style={hint}>Select an image layer to adjust it.</div>
+                  )}
                 </>
               )}
+
               {tab === "layers" && (
                 <>
                   <div style={{ padding: 10, display: "grid", gap: 8 }}>
@@ -2283,46 +2486,53 @@ onTouchStart={(e) => {
                   <div style={{ padding: 10 }}>
                     <div style={{ fontWeight: 900, marginBottom: 8 }}>Align</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                      <button style={btnTile} onClick={alignSelectedCenterX} disabled={!selectedId}>Center X</button>
-                      <button style={btnTile} onClick={alignSelectedCenterY} disabled={!selectedId}>Center Y</button>
-                      <button style={btnTile} onClick={alignSelectedTop} disabled={!selectedId}>Top</button>
-                      <button style={btnTile} onClick={alignSelectedBottom} disabled={!selectedId}>Bottom</button>
+                      <button style={btnTile} onClick={alignSelectedCenterX} disabled={!selectedId}>
+                        Center X
+                      </button>
+                      <button style={btnTile} onClick={alignSelectedCenterY} disabled={!selectedId}>
+                        Center Y
+                      </button>
+                      <button style={btnTile} onClick={alignSelectedTop} disabled={!selectedId}>
+                        Top
+                      </button>
+                      <button style={btnTile} onClick={alignSelectedBottom} disabled={!selectedId}>
+                        Bottom
+                      </button>
                     </div>
                   </div>
                 </>
               )}
 
+              {tab === "export" && (
+                <div style={{ padding: 12, display: "grid", gap: 12 }}>
+                  <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
 
-{tab === "export" && (
-  <div style={{ padding: 12, display: "grid", gap: 12 }}>
-    <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
+                  <button style={tileBtn} onClick={handleExport}>
+                    Export PNG $5
+                  </button>
 
-    <button style={tileBtn} onClick={handleExport}>
-      Export PNG $5
-    </button>
+                  <div
+                    style={{
+                      height: 1,
+                      background: "rgba(255,255,255,0.12)",
+                      margin: "4px 0",
+                    }}
+                  />
 
-    <div
-      style={{
-        height: 1,
-        background: "rgba(255,255,255,0.12)",
-        margin: "4px 0",
-      }}
-    />
+                  <div style={{ fontWeight: 900, fontSize: 15 }}>Add Music for Video Export</div>
 
-    <div style={{ fontWeight: 900, fontSize: 15 }}>Add Music for Video Export</div>
+                  <MusicClipPicker
+                    musicUrl={musicUrl}
+                    clipStart={clipStart}
+                    clipDuration={clipDuration}
+                    onMusicChange={handleMusicChange}
+                  />
 
-    <MusicClipPicker
-      musicUrl={musicUrl}
-      clipStart={clipStart}
-      clipDuration={clipDuration}
-      onMusicChange={handleMusicChange}
-    />
-
- <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
-  Export PNG + MP4 $8
-</button>
-  </div>
-)}
+                  <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
+                    Export PNG + MP4 $8
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2398,18 +2608,31 @@ function CanvasTextItem({
     const group = groupRef.current;
     const textNode = textRef.current;
     if (!group) return;
+
     if (item.curveEnabled) {
       group.offsetX(0);
       group.offsetY(0);
       group.getLayer()?.batchDraw();
       return;
     }
+
     if (!textNode) return;
+
     if (item.align === "center") group.offsetX(textNode.width() / 2);
     else if (item.align === "right") group.offsetX(textNode.width());
     else group.offsetX(0);
+
     group.getLayer()?.batchDraw();
-  }, [item.text, item.fontFamily, item.fontSize, item.fontWeight, item.fontStyle, item.letterSpacing, item.align, item.curveEnabled]);
+  }, [
+    item.text,
+    item.fontFamily,
+    item.fontSize,
+    item.fontWeight,
+    item.fontStyle,
+    item.letterSpacing,
+    item.align,
+    item.curveEnabled,
+  ]);
 
   const curveData = arcPath(item.curveRadius * ratio, item.curveArc, item.curveReverse);
   const shadowOpacity = item.shadowEnabled ? item.shadowOpacity : 0;
@@ -2425,10 +2648,10 @@ function CanvasTextItem({
       y={scaledY}
       rotation={item.rotation}
       draggable
-    onMouseDown={() => onSelect(item.id)}
-onTouchStart={() => onSelect(item.id)}
-onClick={() => onSelect(item.id)}
-onTap={() => onSelect(item.id)}
+      onMouseDown={() => onSelect(item.id)}
+      onTouchStart={() => onSelect(item.id)}
+      onClick={() => onSelect(item.id)}
+      onTap={() => onSelect(item.id)}
       onDragMove={(e) => onDragMove(e.target)}
       onDragEnd={(e) => {
         onUpdate(item.id, { x: e.target.x() / ratio, y: e.target.y() / ratio });
@@ -2440,6 +2663,7 @@ onTap={() => onSelect(item.id)}
         const nextFont = Math.max(10, Math.round(item.fontSize * scaleX));
         node.scaleX(1);
         node.scaleY(1);
+
         onUpdate(item.id, {
           fontSize: nextFont,
           rotation: node.rotation(),
@@ -2524,138 +2748,140 @@ function CanvasImageItem({
 
   useEffect(() => {
     let cancelled = false;
+
     loadHtmlImage(item.src)
       .then((i) => !cancelled && setImg(i))
       .catch(() => !cancelled && setImg(null));
+
     return () => {
       cancelled = true;
     };
   }, [item.src]);
 
-useEffect(() => {
-  const node = nodeRef.current;
-  if (!node || !img) return;
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node || !img) return;
 
-  const adj = item.adj ?? defaultAdj();
+    const adj = item.adj ?? defaultAdj();
 
-  const brightness = adj.brightness ?? 0;
-  const exposure = adj.exposure ?? 0;
-  const contrast = adj.contrast ?? 0;
-  const saturation = adj.saturation ?? 0;
-  const hue = adj.hue ?? 0;
-  const blur = adj.blur ?? 0;
-  const clarity = adj.clarity ?? 0;
-  const texture = adj.texture ?? 0;
-const grain = adj.grain ?? 0;
-const warmth = adj.warmth ?? 0;
-const highlights = adj.highlights ?? 0;
-const shadows = adj.shadows ?? 0;
-const fade = adj.fade ?? 0;
-const hdr = adj.hdr ?? 0;
-const sharpen = adj.sharpen ?? 0;
-const curvePreset = adj.curvePreset ?? "none";
+    const brightness = adj.brightness ?? 0;
+    const exposure = adj.exposure ?? 0;
+    const contrast = adj.contrast ?? 0;
+    const saturation = adj.saturation ?? 0;
+    const hue = adj.hue ?? 0;
+    const blur = adj.blur ?? 0;
+    const clarity = adj.clarity ?? 0;
+    const texture = adj.texture ?? 0;
+    const grain = adj.grain ?? 0;
+    const warmth = adj.warmth ?? 0;
+    const highlights = adj.highlights ?? 0;
+    const shadows = adj.shadows ?? 0;
+    const fade = adj.fade ?? 0;
+    const hdr = adj.hdr ?? 0;
+    const sharpen = adj.sharpen ?? 0;
+    const curvePreset = adj.curvePreset ?? "none";
 
-  node.clearCache();
-  node.cache();
+    node.clearCache();
+    node.cache();
 
-  node.filters([
-    Konva.Filters.Brighten,
-    Konva.Filters.Contrast,
-    Konva.Filters.HSL,
-    Konva.Filters.Blur,
-    Konva.Filters.Noise,
-  ]);
+    node.filters([
+      Konva.Filters.Brighten,
+      Konva.Filters.Contrast,
+      Konva.Filters.HSL,
+      Konva.Filters.Blur,
+      Konva.Filters.Noise,
+    ]);
 
-  let finalBrightness = brightness + exposure * 0.35;
-  finalBrightness += shadows * 0.12;
-  finalBrightness -= highlights * 0.08;
-  finalBrightness += fade * 0.08;
+    let finalBrightness = brightness + exposure * 0.35;
+    finalBrightness += shadows * 0.12;
+    finalBrightness -= highlights * 0.08;
+    finalBrightness += fade * 0.08;
 
- let finalContrast = contrast;
-finalContrast += clarity * 35;
-finalContrast += hdr * 18;
-finalContrast += sharpen * 16;
+    let finalContrast = contrast;
+    finalContrast += clarity * 35;
+    finalContrast += hdr * 18;
+    finalContrast += sharpen * 16;
 
-  if (curvePreset === "medium-contrast") {
-    finalContrast += 12;
-  } else if (curvePreset === "strong-contrast") {
-    finalContrast += 24;
-  } else if (curvePreset === "fade-film") {
-    finalContrast -= 10;
-  }
+    if (curvePreset === "medium-contrast") {
+      finalContrast += 12;
+    } else if (curvePreset === "strong-contrast") {
+      finalContrast += 24;
+    } else if (curvePreset === "fade-film") {
+      finalContrast -= 10;
+    }
 
-  finalContrast -= fade * 18;
+    finalContrast -= fade * 18;
 
-  let finalSaturation = saturation + clarity * 0.25;
-finalSaturation += sharpen * 0.06;
+    let finalSaturation = saturation + clarity * 0.25;
+    finalSaturation += sharpen * 0.06;
 
-  if (warmth > 0) {
-    finalSaturation += warmth * 0.12;
-  } else {
-    finalSaturation += warmth * 0.04;
-  }
+    if (warmth > 0) {
+      finalSaturation += warmth * 0.12;
+    } else {
+      finalSaturation += warmth * 0.04;
+    }
 
-  if (curvePreset === "fade-film") {
-    finalSaturation -= 0.12;
-  }
+    if (curvePreset === "fade-film") {
+      finalSaturation -= 0.12;
+    }
 
-  const finalHue = hue + warmth * 10;
+    const finalHue = hue + warmth * 10;
 
-let finalNoise = 0;
-finalNoise += texture * 0.18;
-finalNoise += grain * 0.22;
-finalNoise += sharpen * 0.04;
+    let finalNoise = 0;
+    finalNoise += texture * 0.18;
+    finalNoise += grain * 0.22;
+    finalNoise += sharpen * 0.04;
 
-  node.brightness(finalBrightness);
-  node.contrast(finalContrast);
-  node.saturation(finalSaturation);
-  node.hue(finalHue);
-  node.blurRadius(blur);
-  node.noise(Math.max(0, finalNoise));
+    node.brightness(finalBrightness);
+    node.contrast(finalContrast);
+    node.saturation(finalSaturation);
+    node.hue(finalHue);
+    node.blurRadius(blur);
+    node.noise(Math.max(0, finalNoise));
 
-  node.getLayer()?.batchDraw();
-}, [img, item.adj, item.width, item.height]);
+    node.getLayer()?.batchDraw();
+  }, [img, item.adj, item.width, item.height]);
 
   return (
-<KImage
-  ref={nodeRef as any}
-  id={item.id}
-  image={img ?? undefined}
-  x={item.x * ratio}
-  y={item.y * ratio}
-  rotation={item.rotation}
-  width={item.width * ratio}
-  height={item.height * ratio}
-  scaleX={item.scale ?? 1}
-  scaleY={item.scale ?? 1}
-  draggable
-  onMouseDown={() => onSelect(item.id)}
-  onTouchStart={() => onSelect(item.id)}
-  onClick={() => onSelect(item.id)}
-  onTap={() => onSelect(item.id)}
-  onDragMove={(e) => onDragMove(e.target)}
-  onDragEnd={(e) => {
-    onUpdate(item.id, { x: e.target.x() / ratio, y: e.target.y() / ratio });
-    onDragEnd();
-  }}
-  onTransformEnd={(e) => {
-    const node = e.target as Konva.Image;
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
+    <KImage
+      ref={nodeRef as any}
+      id={item.id}
+      image={img ?? undefined}
+      x={item.x * ratio}
+      y={item.y * ratio}
+      rotation={item.rotation}
+      width={item.width * ratio}
+      height={item.height * ratio}
+      scaleX={item.scale ?? 1}
+      scaleY={item.scale ?? 1}
+      draggable
+      onMouseDown={() => onSelect(item.id)}
+      onTouchStart={() => onSelect(item.id)}
+      onClick={() => onSelect(item.id)}
+      onTap={() => onSelect(item.id)}
+      onDragMove={(e) => onDragMove(e.target)}
+      onDragEnd={(e) => {
+        onUpdate(item.id, { x: e.target.x() / ratio, y: e.target.y() / ratio });
+        onDragEnd();
+      }}
+      onTransformEnd={(e) => {
+        const node = e.target as Konva.Image;
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
 
-    const nextScale = Math.max(0.2, Math.min((scaleX + scaleY) / 2, 8));
+        const nextScale = Math.max(0.2, Math.min((scaleX + scaleY) / 2, 8));
 
-    node.scaleX(1);
-    node.scaleY(1);
+        node.scaleX(1);
+        node.scaleY(1);
 
-    onUpdate(item.id, {
-      scale: nextScale,
-      rotation: node.rotation(),
-      x: node.x() / ratio,
-      y: node.y() / ratio,
-    });
-  }}
-/>
+        onUpdate(item.id, {
+          scale: nextScale,
+          rotation: node.rotation(),
+          x: node.x() / ratio,
+          y: node.y() / ratio,
+        });
+      }}
+    />
   );
 }
 
@@ -2759,6 +2985,7 @@ const canvasArea: React.CSSProperties = {
   alignItems: "flex-start",
   overflow: "hidden",
 };
+
 const canvasWrap: React.CSSProperties = {
   width: "100%",
   height: "100%",
