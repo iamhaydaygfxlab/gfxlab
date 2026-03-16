@@ -25,8 +25,51 @@ export type ImageAdjustments = {
   curvePreset: "none" | "medium-contrast" | "strong-contrast" | "fade-film";
 };
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function Slider({
+  label,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 6,
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        <span>{label}</span>
+        <span>{typeof value === "number" ? value.toFixed(2) : value}</span>
+      </div>
+
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ width: "100%" }}
+      />
+    </div>
+  );
 }
 
 export default function ImagePanel({
@@ -124,15 +167,6 @@ export default function ImagePanel({
       />
 
       <Slider
-        label="Sharpen"
-        min={0}
-        max={1}
-        step={0.01}
-        value={value.sharpen ?? 0}
-        onChange={(v) => onChange({ ...value, sharpen: clamp(v, 0, 1) })}
-      />
-
-      <Slider
         label="HDR"
         min={0}
         max={1}
@@ -157,6 +191,15 @@ export default function ImagePanel({
         step={0.01}
         value={value.clarity ?? 0}
         onChange={(v) => onChange({ ...value, clarity: clamp(v, 0, 1) })}
+      />
+
+      <Slider
+        label="Sharpen"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value.sharpen ?? 0}
+        onChange={(v) => onChange({ ...value, sharpen: clamp(v, 0, 1) })}
       />
 
       <Slider
@@ -207,12 +250,7 @@ export default function ImagePanel({
             curvePreset: e.target.value as ImageAdjustments["curvePreset"],
           })
         }
-        style={{
-          width: "100%",
-          height: 44,
-          borderRadius: 12,
-          marginBottom: 12,
-        }}
+        style={selectStyle}
       >
         <option value="none">None</option>
         <option value="medium-contrast">Medium Contrast</option>
@@ -227,58 +265,31 @@ export default function ImagePanel({
   );
 }
 
-function Slider({
-  label, min, max, step, value, onChange,
-}: {
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={labelStyle}>
-        <span>{label}</span>
-        <span style={{ opacity: 0.8 }}>{value}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: "100%" }}
-      />
-    </div>
-  );
-}
-
 const wrap: React.CSSProperties = {
   padding: 12,
-  borderRadius: 12,
-  background: "rgba(255,255,255,0.06)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
 };
 
-const labelStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  fontSize: 12,
-  fontWeight: 800,
-  opacity: 0.9,
-  marginBottom: 6,
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  height: 44,
+  borderRadius: 12,
+  marginBottom: 12,
+  padding: "0 12px",
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "rgba(0,0,0,0.55)",
+  color: "white",
 };
 
 const btn: React.CSSProperties = {
   width: "100%",
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.06)",
+  height: 46,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "linear-gradient(135deg,#d1b15a,#000000)",
   color: "white",
-  cursor: "pointer",
   fontWeight: 800,
+  cursor: "pointer",
 };

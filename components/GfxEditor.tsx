@@ -29,7 +29,7 @@ import AssetLibrary, { type AssetItem } from "./AssetLibrary";
 import FontPanel from "./FontPanel";
 import ImagePanel, { type ImageAdjustments } from "./ImagePanel";
 import LayersPanel from "./LayersPanel";
-import TemplateLibrary from "./TemplateLibrary";
+
 import { type FireTemplate } from "@/lib/templates";
 import MusicClipPicker from "./MusicClipPicker";
 
@@ -95,6 +95,18 @@ type ImageItem = {
   height: number;
   scale: number;
   adj: ImageAdjustments;
+};
+type MotionItem = {
+  id: string;
+  kind: "motion";
+  x: number;
+  y: number;
+  rotation: number;
+  src: string;
+  width: number;
+  height: number;
+  scale: number;
+  opacity: number;
 };
 
 type Item = TextItem | ImageItem;
@@ -285,6 +297,12 @@ const SOCIAL_PRESETS: SizePreset[] = [
 ];
 
 const ALL_PRESETS: SizePreset[] = [...COVER_PRESETS, ...FLYER_PRESETS, ...SOCIAL_PRESETS];
+const MOTION_ASSETS = [
+  { id: "smoke", name: "Smoke", src: "/motion/smoke.mp4" },
+  { id: "rain", name: "Rain", src: "/motion/rain.mp4" },
+  { id: "fire", name: "Fire", src: "/motion/fire.mp4" },
+  { id: "sparkles", name: "Sparkles", src: "/motion/sparkles.mp4" },
+];
 
 function openGfxDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -466,23 +484,27 @@ export default function GfxEditor() {
     () => items.find((i) => i.id === selectedId) ?? null,
     [items, selectedId]
   );
-  const selectedText = selectedItem?.kind === "text" ? selectedItem : null;
-  const selectedImage = selectedItem?.kind === "image" ? selectedItem : null;
+const selectedText = selectedItem?.kind === "text" ? selectedItem : null;
+const selectedImage = selectedItem?.kind === "image" ? selectedItem : null;
 
-  const layers = useMemo(() => {
-    return items.map((it) => {
-      if (it.kind === "text") {
-        const clean = it.text.replace(/\s+/g, " ").trim();
-        const label = clean.length
-          ? clean.length > 24
-            ? clean.slice(0, 24) + "…"
-            : clean
-          : "Text";
-        return { id: it.id, kind: "text" as const, label };
-      }
-      return { id: it.id, kind: "image" as const, label: "Image" };
-    });
-  }, [items]);
+
+const layers = useMemo(() => {
+  return items.map((it) => {
+    if (it.kind === "text") {
+      const clean = it.text.replace(/\s+/g, " ").trim();
+      const label = clean.length
+        ? clean.length > 24
+          ? clean.slice(0, 24) + "…"
+          : clean
+        : "Text";
+      return { id: it.id, kind: "text" as const, label };
+    }
+
+   
+
+    return { id: it.id, kind: "image" as const, label: "Image" };
+  });
+}, [items]);
 
   const registerNode = useCallback((id: string, node: Konva.Node | null) => {
     if (node) nodeMapRef.current[id] = node;
@@ -2025,13 +2047,7 @@ async function exportVideoFile() {
             <option value="social">Social</option>
           </select>
 
-          {!paid ? (
-            <button onClick={goToProCheckout} style={upgradeBtn} title="Upgrade to Pro">
-              Upgrade
-            </button>
-          ) : (
-            <div style={proPill}>PRO</div>
-          )}
+  
         </div>
 
         <input
@@ -2113,34 +2129,33 @@ async function exportVideoFile() {
                   <Rect x={0} y={0} width={view.w} height={view.h} fill="#000000" listening={false} />
                 )}
 
-                {items.map((it) =>
-                  it.kind === "text" ? (
-                    <CanvasTextItem
-                      key={it.id}
-                      item={it}
-                      ratio={view.ratio}
-                      onSelect={setSelectedId}
-                      onUpdate={updateItem}
-                      onDragMove={(node) => applySnapping(node)}
-                      onDragEnd={clearGuides}
-                      registerNode={registerNode}
-                    />
-                  ) : (
-                    <CanvasImageItem
-                      key={it.id}
-                      item={it}
-                      ratio={view.ratio}
-                      canvasW={view.w}
-                      canvasH={view.h}
-                      onSelect={setSelectedId}
-                      onUpdate={updateItem}
-                      onDragMove={(node) => applySnapping(node)}
-                      onDragEnd={clearGuides}
-                      registerNode={registerNode}
-                    />
-                  )
-                )}
-
+{items.map((it) =>
+  it.kind === "text" ? (
+    <CanvasTextItem
+      key={it.id}
+      item={it}
+      ratio={view.ratio}
+      onSelect={setSelectedId}
+      onUpdate={updateItem}
+      onDragMove={(node: Konva.Node | null) => applySnapping(node)}
+      onDragEnd={clearGuides}
+      registerNode={registerNode}
+    />
+  ) : (
+    <CanvasImageItem
+      key={it.id}
+      item={it}
+      ratio={view.ratio}
+      canvasW={view.w}
+      canvasH={view.h}
+      onSelect={setSelectedId}
+      onUpdate={updateItem}
+      onDragMove={(node: Konva.Node | null) => applySnapping(node)}
+      onDragEnd={clearGuides}
+      registerNode={registerNode}
+    />
+  )
+)}
                 {watermarkEnabled && wmImg && !exporting && (
                   <KImage
                     image={wmImg}
@@ -2307,10 +2322,7 @@ async function exportVideoFile() {
                     </label>
                   </div>
 
-                  <div style={{ padding: "10px" }}>
-                    <div style={{ fontWeight: 900, marginBottom: 8 }}>Live Templates</div>
-                    <TemplateLibrary type={projectType} paid={paid} onPick={loadTemplate} />
-                  </div>
+            
 
                   <AssetLibrary onPick={addAssetToCanvas} />
                 </div>
@@ -2519,7 +2531,7 @@ async function exportVideoFile() {
                   <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
 
                   <button style={tileBtn} onClick={handleExport}>
-                    Export PNG $5
+                    Export Image Only $5
                   </button>
 
                   <div
@@ -2540,7 +2552,7 @@ async function exportVideoFile() {
                   />
 
                   <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
-                    Export PNG + MP4 $8
+                    Export image with Music $8 
                   </button>
                 </div>
               )}

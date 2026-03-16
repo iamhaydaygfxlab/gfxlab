@@ -14,8 +14,7 @@ export type FireAsset = {
   id: string;
   name?: string;
   type: AssetType;
-  url: string;
-  path?: string;
+  path: string;      // ✅ stored from cloud function
   createdAt?: any;
 };
 
