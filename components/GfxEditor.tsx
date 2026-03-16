@@ -409,6 +409,7 @@ export default function GfxEditor() {
   const [hostSize, setHostSize] = useState({ w: 800, h: 600 });
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
+  const [creatingAIBackground, setCreatingAIBackground] = useState(false);
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
@@ -1192,29 +1193,35 @@ const layers = useMemo(() => {
     }
   }
 
-  async function makeAiBackground() {
-    const idea = window.prompt("Describe your background");
-    if (!idea) return;
+async function makeAiBackground() {
+  const idea = window.prompt("Describe your background");
+  if (!idea) return;
 
-    try {
-      const size = preset.w >= preset.h ? "1536x1024" : "1024x1536";
-      const res = await fetch("/api/ai/background", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: idea, size }),
-      });
+  try {
+    setCreatingAIBackground(true);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "AI failed");
+    const size = preset.w >= preset.h ? "1536x1024" : "1024x1536";
 
-      const url = data?.image || data?.dataUrl;
-      if (!url) throw new Error("No image returned");
+    const res = await fetch("/api/ai/background", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: idea, size }),
+    });
 
-      setBgSrc(url);
-    } catch (e: any) {
-      alert(e?.message || "AI failed");
-    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "AI failed");
+
+    const url = data?.image || data?.dataUrl;
+    if (!url) throw new Error("No image returned");
+
+    setBgSrc(url);
+
+  } catch (e: any) {
+    alert(e?.message || "AI failed");
+  } finally {
+    setCreatingAIBackground(false);
   }
+}
 
   function deselect(e: any) {
     const stage = stageRef.current;
@@ -2302,9 +2309,14 @@ async function exportVideoFile() {
                       />
                     </label>
 
-                    <button style={tileBtn} onClick={makeAiBackground}>
-                      Create AI Background
-                    </button>
+                <button
+  onClick={makeAiBackground}
+  disabled={creatingAIBackground}
+>
+  {creatingAIBackground
+    ? "✨ Generating Scene......"
+    : "Create AI Background"}
+</button>
 
                     <label style={tileBtn}>
                       {cutoutLoading ? "Cutting out..." : "Remove Background From Photo"}
