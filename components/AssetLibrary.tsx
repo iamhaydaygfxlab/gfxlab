@@ -29,10 +29,12 @@ export default function AssetLibrary({
   const [type, setType] = useState<AssetType>("background");
   const [assets, setAssets] = useState<FireAsset[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    setSelectedAssetId(null);
 
     fetchAssets(type)
       .then((rows) => {
@@ -62,6 +64,15 @@ export default function AssetLibrary({
       name: a.name,
       type: a.type,
     });
+  }
+
+  function handleAssetTap(a: FireAsset) {
+    if (selectedAssetId === a.id) {
+      pickAsset(a);
+      return;
+    }
+
+    setSelectedAssetId(a.id);
   }
 
   return (
@@ -96,61 +107,65 @@ export default function AssetLibrary({
           padding: "10px 4px",
         }}
       >
-        {assets.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => pickAsset(a)}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              pickAsset(a);
-            }}
-            title={a.name || "asset"}
-            style={{
-              borderRadius: 14,
-              overflow: "hidden",
-              border: "1px solid rgba(255,255,255,0.18)",
-              background: "linear-gradient(135deg,#d1b15a,#000000)",
-              color: "white",
-              fontWeight: 700,
-              fontSize: 14,
-              height: 110,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              textAlign: "center",
-              padding: "10px",
-              cursor: "pointer",
-              touchAction: "manipulation",
-            }}
-          >
-            {a.path ? (
-              <img
-                src={makeAssetUrl(a.path)}
-                alt={a.name || "asset"}
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  objectFit: "contain",
-                  display: "block",
-                  pointerEvents: "none",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  color: "white",
-                  fontSize: 12,
-                  opacity: 0.7,
-                  textAlign: "center",
-                  padding: 12,
-                }}
-              >
-                Missing asset image
-              </div>
-            )}
-          </button>
-        ))}
+        {assets.map((a) => {
+          const isSelected = selectedAssetId === a.id;
+
+          return (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => handleAssetTap(a)}
+              onDoubleClick={() => pickAsset(a)}
+              title={a.name || "asset"}
+              style={{
+                borderRadius: 14,
+                overflow: "hidden",
+                border: isSelected
+                  ? "2px solid #d1b15a"
+                  : "1px solid rgba(255,255,255,0.18)",
+                background: "linear-gradient(135deg,#d1b15a,#000000)",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 14,
+                height: 110,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                padding: "10px",
+                cursor: "pointer",
+                touchAction: "manipulation",
+                boxShadow: isSelected ? "0 0 0 2px rgba(209,177,90,0.25)" : "none",
+              }}
+            >
+              {a.path ? (
+                <img
+                  src={makeAssetUrl(a.path)}
+                  alt={a.name || "asset"}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    objectFit: "contain",
+                    display: "block",
+                    pointerEvents: "none",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    color: "white",
+                    fontSize: 12,
+                    opacity: 0.7,
+                    textAlign: "center",
+                    padding: 12,
+                  }}
+                >
+                  Missing asset image
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
