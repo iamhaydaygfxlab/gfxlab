@@ -441,23 +441,23 @@ export default function GfxEditor() {
   const sheetHeight =
     tab === "assets"
       ? isMobile
-        ? "min(420px, 48vh)"
-        : "min(360px, 40vh)"
+        ? "min(420px, 28vh)"
+        : "min(360px, 30vh)"
       : tab === "text"
       ? isMobile
-        ? "min(420px, 48vh)"
-        : "min(360px, 40vh)"
+        ? "min(420px, 28vh)"
+        : "min(360px, 30vh)"
       : tab === "adjust"
       ? isMobile
-        ? "min(360px, 42vh)"
+        ? "min(360px, 28vh)"
         : "min(300px, 34vh)"
       : tab === "layers"
       ? isMobile
-        ? "min(360px, 42vh)"
+        ? "min(360px, 28vh)"
         : "min(280px, 30vh)"
       : tab === "export"
-      ? "min(420px, 48vh)"
-      : "min(360px, 48vh)";
+      ? "min(420px, 28vh)"
+      : "min(360px, 30vh)";
 
   const panelReserve =
     tab !== "none" ? (isMobile ? 220 : 150) : isMobile ? 24 : 0;
