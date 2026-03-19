@@ -1677,9 +1677,23 @@ async function exportVideoFile() {
       setTimeout(() => setExporting(false), 80);
     }
   }
+
 async function handleExport() {
   const platform = Capacitor.getPlatform();
   alert(`handleExport platform: ${platform}`);
+
+  const isNativeMobile = platform === "android" || platform === "ios";
+
+  if (isNativeMobile) {
+    try {
+      alert("About to start native purchase: export_image");
+      await startPurchaseFlow("export_image");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Purchase failed.");
+    }
+    return;
+  }
 
   const uid =
     currentUser?.uid ||
@@ -1691,41 +1705,9 @@ async function handleExport() {
     localStorage.setItem("gfxlab_guest_id", uid);
   }
 
-  const isNativeMobile = platform === "android" || platform === "ios";
-
-  if (isNativeMobile) {
-    const ref = doc(db, "users", uid);
-    const snap = await getDoc(ref);
-    const data = snap.data();
-    const credits = data?.exportCredits || 0;
-
-    if (credits < 1) {
-      try {
-        await startPurchaseFlow("export_image");
-      } catch (err) {
-        console.error(err);
-        alert("Purchase failed.");
-      }
-      return;
-    }
-
-    try {
-      await exportPNG();
-      await updateDoc(ref, {
-        exportCredits: increment(-1),
-      });
-    } catch (err) {
-      console.error(err);
-      alert("Export failed.");
-    }
-    return;
-  }
-
   await saveCurrentDesignForCheckout();
-
   window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}`;
 }
-
 async function handleMusicExport() {
   if (!musicFile) {
     alert("Upload music first.");
@@ -1733,6 +1715,18 @@ async function handleMusicExport() {
   }
 
   const platform = Capacitor.getPlatform();
+  const isNativeMobile = platform === "android" || platform === "ios";
+
+  if (isNativeMobile) {
+    try {
+      alert("About to start native purchase: export_with_music");
+      await startPurchaseFlow("export_with_music");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Purchase failed.");
+    }
+    return;
+  }
 
   const uid =
     currentUser?.uid ||
@@ -1742,36 +1736,6 @@ async function handleMusicExport() {
 
   if (typeof window !== "undefined" && uid) {
     localStorage.setItem("gfxlab_guest_id", uid);
-  }
-
-  const isNativeMobile = platform === "android" || platform === "ios";
-
-  if (isNativeMobile) {
-    const ref = doc(db, "users", uid);
-    const snap = await getDoc(ref);
-    const data = snap.data();
-    const credits = data?.exportMusicCredits || 0;
-
-    if (credits < 1) {
-      try {
-        await startPurchaseFlow("export_with_music");
-      } catch (err) {
-        console.error(err);
-        alert("Purchase failed.");
-      }
-      return;
-    }
-
-    try {
-      await exportBundleFiles();
-      await updateDoc(ref, {
-        exportMusicCredits: increment(-1),
-      });
-    } catch (err) {
-      console.error(err);
-      alert("Export failed.");
-    }
-    return;
   }
 
   const file: File = musicFile;
@@ -1801,7 +1765,6 @@ async function handleMusicExport() {
     alert("Could not upload music file.");
   }
 }
-
 function loadTemplate(template: FireTemplate) {
     setProjectType(template.type);
     setPresetId(template.presetId);
