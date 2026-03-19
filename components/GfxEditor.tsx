@@ -1678,17 +1678,22 @@ async function exportVideoFile() {
     }
   }
 async function handleExport() {
-  if (!currentUser?.uid) {
-    alert("Please log in first.");
-    return;
-  }
+const uid =
+  currentUser?.uid ||
+  (typeof window !== "undefined"
+    ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+    : "");
+
+if (typeof window !== "undefined" && uid) {
+  localStorage.setItem("gfxlab_guest_id", uid);
+}
 
   const platform = Capacitor.getPlatform();
   alert(`handleExport platform: ${platform}`);
   const isNativeMobile = platform === "android" || platform === "ios";
 
   if (isNativeMobile) {
-    const ref = doc(db, "users", currentUser.uid);
+    const ref = doc(db, "users", uid);
     const snap = await getDoc(ref);
     const data = snap.data();
     const credits = data?.exportCredits || 0;
@@ -1732,10 +1737,15 @@ async function handleExport() {
 }
 
 async function handleMusicExport() {
-  if (!currentUser?.uid) {
-    alert("Please log in first.");
-    return;
-  }
+const uid =
+  currentUser?.uid ||
+  (typeof window !== "undefined"
+    ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+    : "");
+
+if (typeof window !== "undefined" && uid) {
+  localStorage.setItem("gfxlab_guest_id", uid);
+}
 
   if (!musicFile) {
     alert("Upload music first.");
@@ -1746,7 +1756,7 @@ async function handleMusicExport() {
   const isNativeMobile = platform === "android" || platform === "ios";
 
   if (isNativeMobile) {
-    const ref = doc(db, "users", currentUser.uid);
+    const ref = doc(db, "users", uid);
     const snap = await getDoc(ref);
     const data = snap.data();
     const credits = data?.exportMusicCredits || 0;
