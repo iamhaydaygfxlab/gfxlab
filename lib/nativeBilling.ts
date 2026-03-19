@@ -7,9 +7,9 @@ declare global {
   }
 }
 
-const PRODUCT_IDS = [
-  "export_image",
-  "export_with_music",
+const PRODUCTS = [
+  { id: "export_image", type: "consumable" },
+  { id: "export_with_music", type: "consumable" },
 ];
 
 let initialized = false;
@@ -32,10 +32,13 @@ export async function initNativeBilling() {
       ? CdvPurchase.Platform.GOOGLE_PLAY
       : CdvPurchase.Platform.APPLE_APPSTORE;
 
-  PRODUCT_IDS.forEach((id) => {
+  PRODUCTS.forEach((product) => {
     store.register({
-      id,
-      type: CdvPurchase.ProductType.NON_CONSUMABLE,
+      id: product.id,
+      type:
+        product.type === "consumable"
+          ? CdvPurchase.ProductType.CONSUMABLE
+          : CdvPurchase.ProductType.NON_CONSUMABLE,
       platform: nativePlatform,
     });
   });
@@ -68,5 +71,10 @@ export async function buyNativeProduct(productId: string) {
     throw new Error(`Product not found: ${productId}`);
   }
 
-  await product.getOffer()?.order();
+  const offer = product.getOffer?.();
+  if (!offer) {
+    throw new Error(`No offer found for product: ${productId}`);
+  }
+
+  await offer.order();
 }
