@@ -2574,7 +2574,7 @@ function loadTemplate(template: FireTemplate) {
                   <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
 
                   <button style={tileBtn} onClick={handleExport}>
-                    ANDROID TEST EXPORT $5
+                    Export Image Only $5
                   </button>
 
                   <div
