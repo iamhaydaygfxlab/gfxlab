@@ -1678,18 +1678,19 @@ async function exportVideoFile() {
     }
   }
 async function handleExport() {
-const uid =
-  currentUser?.uid ||
-  (typeof window !== "undefined"
-    ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-    : "");
-
-if (typeof window !== "undefined" && uid) {
-  localStorage.setItem("gfxlab_guest_id", uid);
-}
-
   const platform = Capacitor.getPlatform();
   alert(`handleExport platform: ${platform}`);
+
+  const uid =
+    currentUser?.uid ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+      : "");
+
+  if (typeof window !== "undefined" && uid) {
+    localStorage.setItem("gfxlab_guest_id", uid);
+  }
+
   const isNativeMobile = platform === "android" || platform === "ios";
 
   if (isNativeMobile) {
@@ -1722,37 +1723,27 @@ if (typeof window !== "undefined" && uid) {
 
   await saveCurrentDesignForCheckout();
 
-  const guestId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-      : "";
-
-  if (typeof window !== "undefined" && guestId) {
-    localStorage.setItem("gfxlab_guest_id", guestId);
-  }
-
-  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(
-    guestId
-  )}`;
+  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}`;
 }
 
 async function handleMusicExport() {
-const uid =
-  currentUser?.uid ||
-  (typeof window !== "undefined"
-    ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-    : "");
-
-if (typeof window !== "undefined" && uid) {
-  localStorage.setItem("gfxlab_guest_id", uid);
-}
-
   if (!musicFile) {
     alert("Upload music first.");
     return;
   }
 
   const platform = Capacitor.getPlatform();
+
+  const uid =
+    currentUser?.uid ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+      : "");
+
+  if (typeof window !== "undefined" && uid) {
+    localStorage.setItem("gfxlab_guest_id", uid);
+  }
+
   const isNativeMobile = platform === "android" || platform === "ios";
 
   if (isNativeMobile) {
@@ -1804,18 +1795,7 @@ if (typeof window !== "undefined" && uid) {
       sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
     }
 
-    const guestId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-        : "";
-
-    if (typeof window !== "undefined" && guestId) {
-      localStorage.setItem("gfxlab_guest_id", guestId);
-    }
-
-    window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(
-      guestId
-    )}`;
+    window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(uid)}`;
   } catch (err) {
     console.error(err);
     alert("Could not upload music file.");
