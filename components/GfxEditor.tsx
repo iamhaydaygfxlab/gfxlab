@@ -15,23 +15,20 @@ import {
 } from "react-konva";
 import { getAuth, signOut } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import {
-  addDoc,
-  collection,
-  doc,
-  onSnapshot,
-  serverTimestamp,
-} from "firebase/firestore";
-
+import { addDoc, collection, doc, getDoc, increment, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { startPurchaseFlow } from "@/lib/startPurchaseFlow";
+import { api } from "@/lib/api";
 import { app, db } from "@/lib/firebase";
 import { cutoutPersonToPngDataUrl } from "@/lib/cutout";
 import AssetLibrary, { type AssetItem } from "./AssetLibrary";
 import FontPanel from "./FontPanel";
 import ImagePanel, { type ImageAdjustments } from "./ImagePanel";
 import LayersPanel from "./LayersPanel";
-
 import { type FireTemplate } from "@/lib/templates";
 import MusicClipPicker from "./MusicClipPicker";
+import { Capacitor } from "@capacitor/core";
+
+
 
 async function ensureFontLoaded(fontFamily: string) {
   if (!fontFamily) return;
@@ -375,6 +372,7 @@ export default function GfxEditor() {
   const [cutoutLoading, setCutoutLoading] = useState(false);
   const [paid, setPaid] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [checkoutRestoreReady, setCheckoutRestoreReady] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("Untitled Design");
@@ -568,29 +566,42 @@ const layers = useMemo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, bgSrc, projectType, presetId]);
 
-  useEffect(() => {
-    const auth = getAuth(app);
-    const unsubAuth = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        setPaid(false);
-        return;
-      }
+useEffect(() => {
+  const auth = getAuth(app);
 
-      const userRef = doc(db, "users", user.uid);
-      const unsubDoc = onSnapshot(
-        userRef,
-        (snap) => {
-          const data = snap.data();
-          setPaid(data?.pro === true);
-        },
-        () => setPaid(false)
-      );
+  let unsubDoc: (() => void) | null = null;
 
-      return () => unsubDoc();
-    });
+  const unsubAuth = auth.onAuthStateChanged((user) => {
+    if (unsubDoc) {
+      unsubDoc();
+      unsubDoc = null;
+    }
 
-    return () => unsubAuth();
-  }, []);
+    setCurrentUser(user ?? null);
+
+    if (!user) {
+      setPaid(false);
+      return;
+    }
+
+    const userRef = doc(db, "users", user.uid);
+    unsubDoc = onSnapshot(
+      userRef,
+      (snap) => {
+        const data = snap.data();
+        setPaid(data?.pro === true);
+      },
+      () => setPaid(false)
+    );
+  });
+
+  return () => {
+    if (unsubDoc) unsubDoc();
+    unsubAuth();
+  };
+}, []);
+
+
 
   useEffect(() => {
     const currentPresetStillValid = presets.some((p) => p.id === presetId);
@@ -715,7 +726,7 @@ const layers = useMemo(() => {
       }
 
       try {
-        const res = await fetch("/api/stripe/verify-session", {
+        const res = await fetch(api("/api/stripe/verify-session"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -835,7 +846,7 @@ const layers = useMemo(() => {
 
     if (src.startsWith("http://") || src.startsWith("https://")) {
       const params = new URLSearchParams({ url: src });
-      return `/api/image-proxy?${params.toString()}`;
+     return api(`/api/image-proxy?${params.toString()}`);
     }
 
     return src;
@@ -1151,7 +1162,7 @@ const layers = useMemo(() => {
       params.set("uid", user.uid);
       if (user.email) params.set("email", user.email);
 
-      window.location.href = `/api/stripe/checkout-pro?${params.toString()}`;
+      window.location.href = api(`/api/stripe/checkout-pro?${params.toString()}`);
     } catch {
       window.location.href = "/login";
     }
@@ -1202,7 +1213,7 @@ async function makeAiBackground() {
 
     const size = preset.w >= preset.h ? "1536x1024" : "1024x1536";
 
-    const res = await fetch("/api/ai/background", {
+    const res = await fetch(api("/api/ai/background"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: idea, size }),
@@ -1555,10 +1566,10 @@ async function exportVideoFile() {
     formData.append("clipStart", String(clipStart));
     formData.append("clipDuration", String(clipDuration));
 
-    const res = await fetch("/api/render-video", {
-      method: "POST",
-      body: formData,
-    });
+  const res = await fetch(api("/api/render-video"), {
+  method: "POST",
+  body: formData,
+});
 
     if (!res.ok) {
       const errText = await res.text();
@@ -1666,14 +1677,122 @@ async function exportVideoFile() {
       setTimeout(() => setExporting(false), 80);
     }
   }
+async function handleExport() {
+  if (!currentUser?.uid) {
+    alert("Please log in first.");
+    return;
+  }
 
-  async function handleExport() {
-    if (paid) {
-      await exportPNG();
+  const platform = Capacitor.getPlatform();
+  alert(`handleExport platform: ${platform}`);
+  const isNativeMobile = platform === "android" || platform === "ios";
+
+  if (isNativeMobile) {
+    const ref = doc(db, "users", currentUser.uid);
+    const snap = await getDoc(ref);
+    const data = snap.data();
+    const credits = data?.exportCredits || 0;
+
+    if (credits < 1) {
+      try {
+        await startPurchaseFlow("export_image");
+      } catch (err) {
+        console.error(err);
+        alert("Purchase failed.");
+      }
       return;
     }
 
+    try {
+      await exportPNG();
+      await updateDoc(ref, {
+        exportCredits: increment(-1),
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Export failed.");
+    }
+    return;
+  }
+
+  await saveCurrentDesignForCheckout();
+
+  const guestId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+      : "";
+
+  if (typeof window !== "undefined" && guestId) {
+    localStorage.setItem("gfxlab_guest_id", guestId);
+  }
+
+  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(
+    guestId
+  )}`;
+}
+
+async function handleMusicExport() {
+  if (!currentUser?.uid) {
+    alert("Please log in first.");
+    return;
+  }
+
+  if (!musicFile) {
+    alert("Upload music first.");
+    return;
+  }
+
+  const platform = Capacitor.getPlatform();
+  const isNativeMobile = platform === "android" || platform === "ios";
+
+  if (isNativeMobile) {
+    const ref = doc(db, "users", currentUser.uid);
+    const snap = await getDoc(ref);
+    const data = snap.data();
+    const credits = data?.exportMusicCredits || 0;
+
+    if (credits < 1) {
+      try {
+        await startPurchaseFlow("export_with_music");
+      } catch (err) {
+        console.error(err);
+        alert("Purchase failed.");
+      }
+      return;
+    }
+
+    try {
+      await exportBundleFiles();
+      await updateDoc(ref, {
+        exportMusicCredits: increment(-1),
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Export failed.");
+    }
+    return;
+  }
+
+  const file: File = musicFile;
+
+  try {
+    const uploadedUrl = await uploadMusicToFirebase(file);
+    setUploadedAudioUrl(uploadedUrl);
+
     await saveCurrentDesignForCheckout();
+
+    await savePendingMusicExport({
+      audioBlob: file,
+      fileName: file.name,
+      fileType: file.type || "audio/mpeg",
+      clipStart,
+      clipDuration,
+    });
+
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("pending_music_export", "true");
+      sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
+    }
 
     const guestId =
       typeof window !== "undefined"
@@ -1684,57 +1803,16 @@ async function exportVideoFile() {
       localStorage.setItem("gfxlab_guest_id", guestId);
     }
 
-    window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(
+    window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(
       guestId
     )}`;
+  } catch (err) {
+    console.error(err);
+    alert("Could not upload music file.");
   }
+}
 
-  async function handleMusicExport() {
-    if (!musicFile) {
-      alert("Please upload a music file first.");
-      return;
-    }
-
-    const file: File = musicFile;
-
-    try {
-      const uploadedUrl = await uploadMusicToFirebase(file);
-      setUploadedAudioUrl(uploadedUrl);
-
-      await saveCurrentDesignForCheckout();
-
-      await savePendingMusicExport({
-        audioBlob: file,
-        fileName: file.name,
-        fileType: file.type || "audio/mpeg",
-        clipStart,
-        clipDuration,
-      });
-
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("pending_music_export", "true");
-        sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
-      }
-
-      const guestId =
-        typeof window !== "undefined"
-          ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-          : "";
-
-      if (typeof window !== "undefined" && guestId) {
-        localStorage.setItem("gfxlab_guest_id", guestId);
-      }
-
-      window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(
-        guestId
-      )}`;
-    } catch (err) {
-      console.error(err);
-      alert("Could not upload music file.");
-    }
-  }
-
-  function loadTemplate(template: FireTemplate) {
+function loadTemplate(template: FireTemplate) {
     setProjectType(template.type);
     setPresetId(template.presetId);
     setBgSrc(template.bgSrc);
@@ -2543,7 +2621,7 @@ async function exportVideoFile() {
                   <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
 
                   <button style={tileBtn} onClick={handleExport}>
-                    Export Image Only $5
+                    ANDROID TEST EXPORT $5
                   </button>
 
                   <div
@@ -3213,3 +3291,4 @@ const hint: React.CSSProperties = {
   fontSize: 12,
   opacity: 0.75,
 };
+
