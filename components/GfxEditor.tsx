@@ -1210,24 +1210,31 @@ async function makeAiBackground() {
 
   try {
     setCreatingAIBackground(true);
+    console.log("AI background button clicked");
 
     const size = preset.w >= preset.h ? "1536x1024" : "1024x1536";
 
-    const res = await fetch(api("/api/ai/background"), {
+    const res = await fetch("/api/ai/background", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: idea, size }),
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || "AI failed");
+    console.log("Response status:", res.status);
 
-    const url = data?.image || data?.dataUrl;
+    const data = await res.json();
+    console.log("AI background response:", data);
+
+    if (!res.ok) {
+      throw new Error(data?.error || "AI failed");
+    }
+
+    const url = data?.image || data?.dataUrl || data?.url;
     if (!url) throw new Error("No image returned");
 
     setBgSrc(url);
-
   } catch (e: any) {
+    console.error("makeAiBackground error:", e);
     alert(e?.message || "AI failed");
   } finally {
     setCreatingAIBackground(false);
@@ -2343,6 +2350,7 @@ function loadTemplate(template: FireTemplate) {
                 <button
   onClick={makeAiBackground}
   disabled={creatingAIBackground}
+  style={tileBtn}
 >
   {creatingAIBackground
     ? "✨ Generating Scene......"
