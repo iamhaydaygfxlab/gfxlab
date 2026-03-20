@@ -2,56 +2,48 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
-    const rawUrl = req.nextUrl.searchParams.get("url");
+    const { searchParams } = new URL(req.url);
+    const rawUrl = searchParams.get("url");
 
     if (!rawUrl) {
       return new NextResponse("Missing url", { status: 400 });
     }
 
-    // IMPORTANT:
-    // Do NOT decode Firebase Storage URLs here.
-    // searchParams.get("url") already gives us the right value.
-    const imageUrl = rawUrl;
-
-    if (
-      !imageUrl.startsWith("http://") &&
-      !imageUrl.startsWith("https://")
-    ) {
-      return new NextResponse("Invalid url", { status: 400 });
-    }
+    const imageUrl = decodeURIComponent(rawUrl);
+    console.log("image-proxy fetching:", imageUrl);
 
     const upstream = await fetch(imageUrl, {
       method: "GET",
-      redirect: "follow",
       headers: {
-        Accept: "image/*,*/*",
+        Accept: "image/*",
       },
       cache: "no-store",
     });
 
     if (!upstream.ok) {
-      const text = await upstream.text().catch(() => "");
-      console.error("UPSTREAM IMAGE PROXY FAILED:", upstream.status, text);
+      const text = await upstream.text();
+      console.error("Upstream fetch failed:", upstream.status, text);
+
       return new NextResponse(
-        `Upstream failed: ${upstream.status}\n${text}`,
+        `Upstream fetch failed: ${upstream.status}\n${text}`,
         { status: upstream.status }
       );
     }
 
-    const contentType =
-      upstream.headers.get("content-type") || "application/octet-stream";
+    const contentType = upstream.headers.get("content-type") || "image/jpeg";
+    const buffer = await upstream.arrayBuffer();
 
-    const bytes = await upstream.arrayBuffer();
-
-    return new NextResponse(bytes, {
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "public, max-age=86400",
       },
     });
-  } catch (error) {
-    console.error("IMAGE PROXY ERROR:", error);
-    return new NextResponse("Proxy error", { status: 500 });
+  } catch (error: any) {
+    console.error("image-proxy error:", error);
+    return new NextResponse(`Proxy failed: ${error?.message || "unknown error"}`, {
+      status: 500,
+    });
   }
 }

@@ -12,6 +12,7 @@ export default function LayersPanel({
   layers,
   selectedId,
   onSelect,
+  onDelete,
   onMoveUp,
   onMoveDown,
   onToFront,
@@ -20,6 +21,7 @@ export default function LayersPanel({
   layers: LayerRow[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
 
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -55,26 +57,47 @@ export default function LayersPanel({
           <div style={{ opacity: 0.7, fontSize: 12 }}>No layers yet.</div>
         ) : (
           layers
-            // topmost at top of list (reverse drawing order)
             .slice()
             .reverse()
             .map((l, idx) => {
               const isActive = l.id === selectedId;
               return (
-                <button
+                <div
                   key={l.id}
-                  type="button"
                   onClick={() => onSelect(l.id)}
                   style={isActive ? rowActive : row}
                 >
                   <div style={badge}>{l.kind === "text" ? "T" : "I"}</div>
-                  <div style={{ flex: 1, textAlign: "left" }}>
-                    <div style={{ fontWeight: 900, fontSize: 12 }}>{l.label}</div>
+
+                  <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 900,
+                        fontSize: 12,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {l.label}
+                    </div>
                     <div style={{ fontSize: 11, opacity: 0.7 }}>
                       {l.kind === "text" ? "Text" : "Image"} • Layer #{layers.length - idx}
                     </div>
                   </div>
-                </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(l.id);
+                    }}
+                    style={deleteBtn}
+                    title="Delete layer"
+                  >
+                    ×
+                  </button>
+                </div>
               );
             })
         )}
@@ -157,4 +180,21 @@ const badge: React.CSSProperties = {
   fontWeight: 1000 as any,
   background: "rgba(255,255,255,0.08)",
   border: "1px solid rgba(255,255,255,0.10)",
+  flexShrink: 0,
+};
+
+const deleteBtn: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.14)",
+  background: "rgba(255,255,255,0.04)",
+  color: "#ff6b6b",
+  cursor: "pointer",
+  fontWeight: 1000,
+  fontSize: 18,
+  lineHeight: 1,
+  display: "grid",
+  placeItems: "center",
+  flexShrink: 0,
 };

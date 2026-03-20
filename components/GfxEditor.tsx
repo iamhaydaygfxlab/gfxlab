@@ -1998,34 +1998,83 @@ function loadTemplate(template: FireTemplate) {
   }
 
   function applyHaydayEffect() {
-    if (!selectedImage) return;
+  if (!selectedImage) return;
 
-    updateItem(selectedImage.id, {
-      adj: {
-        ...selectedImage.adj,
-        brightness: -0.1,
-        exposure: 0.12,
-        contrast: -51,
-        saturation: -1.05,
-        hue: 0,
-        blur: 0,
-        hdr: 0.28,
-        texture: 0.39,
-        clarity: 0.89,
-        sharpen: 0.62,
-        vignette: 0,
-        grain: 0.12,
-        warmth: -0.1,
-        highlights: -0.4,
-        shadows: 0.15,
-        fade: 0.1,
-        denoise: 0.47,
-        curvePreset: "medium-contrast",
-      },
-    } as Partial<Item>);
+  updateItem(selectedImage.id, {
+    adj: {
+      ...selectedImage.adj,
+      brightness: -0.1,
+      exposure: 0.12,
+      contrast: -51,
+      saturation: -1.05,
+      hue: 0,
+      blur: 0,
+      hdr: 0.28,
+      texture: 0.39,
+      clarity: 0.89,
+      sharpen: 0.62,
+      vignette: 0,
+      grain: 0.12,
+      warmth: -0.1,
+      highlights: -0.4,
+      shadows: 0.15,
+      fade: 0.1,
+      denoise: 0.47,
+      curvePreset: "medium-contrast",
+    },
+  } as Partial<Item>);
+}
+
+function handleSelectLayer(id: string) {
+  setSelectedId(id);
+
+  const item = items.find((x) => x.id === id);
+  if (!item) return;
+
+  if (item.kind === "text") {
+    setTab("text");
+    return;
   }
 
-  return (
+  if (item.kind === "image") {
+    setTab("adjust");
+  }
+}
+
+function handleDeleteLayer(id: string) {
+  trRef.current?.nodes([]);
+  trRef.current?.getLayer()?.batchDraw();
+
+  setItems((prev: Item[]) => prev.filter((i) => i.id !== id));
+
+  if (selectedId === id) {
+    setSelectedId(null);
+  }
+}
+
+function handleStartFresh() {
+  const ok = window.confirm("Start fresh? This will clear your current design.");
+  if (!ok) return;
+
+  trRef.current?.nodes([]);
+  trRef.current?.getLayer()?.batchDraw();
+
+  setItems([]);
+  setSelectedId(null);
+  setBgSrc(null);
+  setBgImg(null);
+  setGuides([]);
+  setMusicFile(null);
+  setMusicUrl("");
+  setClipStart(0);
+  setClipDuration(30);
+  setUploadedAudioUrl("");
+  setProjectName("Untitled Design");
+  setProjectId(null);
+  setTab("assets");
+}
+
+return (
     <div style={screen}>
       <div style={header}>
         <style jsx global>{`
@@ -2547,15 +2596,16 @@ function loadTemplate(template: FireTemplate) {
                     </button>
                   </div>
 
-                  <LayersPanel
-                    layers={layers}
-                    selectedId={selectedId}
-                    onSelect={(id) => setSelectedId(id)}
-                    onMoveUp={() => selectedId && moveLayerUp(selectedId)}
-                    onMoveDown={() => selectedId && moveLayerDown(selectedId)}
-                    onToFront={() => selectedId && bringToFront(selectedId)}
-                    onToBack={() => selectedId && sendToBack(selectedId)}
-                  />
+                <LayersPanel
+  layers={layers}
+  selectedId={selectedId}
+  onSelect={handleSelectLayer}
+  onDelete={handleDeleteLayer}
+  onMoveUp={() => selectedId && moveLayerUp(selectedId)}
+  onMoveDown={() => selectedId && moveLayerDown(selectedId)}
+  onToFront={() => selectedId && bringToFront(selectedId)}
+  onToBack={() => selectedId && sendToBack(selectedId)}
+/>
 
                   <div style={{ padding: 10 }}>
                     <div style={{ fontWeight: 900, marginBottom: 8 }}>Align</div>
