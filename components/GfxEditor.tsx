@@ -3030,8 +3030,8 @@ const screen: React.CSSProperties = {
 };
 
 const header: React.CSSProperties = {
-  height: 64,
-  padding: "0 10px",
+  minHeight: 64,
+  padding: "max(4px, env(safe-area-inset-top)) 10px 8px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
@@ -3042,6 +3042,7 @@ const header: React.CSSProperties = {
   top: 0,
   zIndex: 10,
   backdropFilter: "blur(10px)",
+  boxSizing: "border-box",
 };
 
 const iconBtn: React.CSSProperties = {
