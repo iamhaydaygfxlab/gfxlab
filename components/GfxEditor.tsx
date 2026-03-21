@@ -3047,7 +3047,7 @@ const header: React.CSSProperties = {
   justifyContent: "space-between",
   gap: 8,
   borderBottom: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(0, 0, 0, 0.92)",
+  background: "rgba(0, 0, 0, 0.07)",
   position: "sticky",
   top: 0,
   zIndex: 10,
