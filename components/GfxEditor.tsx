@@ -2093,7 +2093,7 @@ return (
 <div
   style={{
     ...header,
-    paddingTop: "calc(env(safe-area-inset-top) + 10px)",
+    paddingTop: "calc(env(safe-area-inset-top) + 15px)",
   }}
 >
         <style jsx global>{`
