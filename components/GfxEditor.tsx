@@ -2084,8 +2084,18 @@ function handleStartFresh() {
 }
 
 return (
-    <div style={screen}>
-      <div style={header}>
+    <div
+  style={{
+    ...screen,
+    paddingTop: "max(env(safe-area-inset-top), 20px)",
+  }}
+>
+    <div
+  style={{
+    ...header,
+    paddingTop: "env(safe-area-inset-top)",
+  }}
+>
         <style jsx global>{`
           html,
           body {
