@@ -124,13 +124,12 @@ function nodeIsGone(node: Konva.Node | null | undefined) {
   const anyNode = node as any;
   return Boolean(anyNode?.isDestroyed?.() || anyNode?._isDestroyed);
 }
-
 export function loadHtmlImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "";
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Image failed to load (CORS): " + src));
+    img.onerror = () => reject(new Error("Image failed to load: " + src));
     img.decoding = "async";
     img.src = src;
   });
@@ -841,16 +840,26 @@ useEffect(() => {
     return () => window.clearTimeout(t);
   }, [checkoutRestoreReady, bgImg, presetId, projectType, musicFile, clipStart, clipDuration]);
 
-  function toSafeSrc(src: string) {
-    if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) return src;
-
-    if (src.startsWith("http://") || src.startsWith("https://")) {
-      const params = new URLSearchParams({ url: src });
-     return api(`/api/image-proxy?${params.toString()}`);
-    }
-
+function toSafeSrc(src: string) {
+  if (
+    src.startsWith("data:") ||
+    src.startsWith("blob:") ||
+    src.startsWith("/")
+  ) {
     return src;
   }
+
+  if (src.includes("firebasestorage.googleapis.com")) {
+    return src;
+  }
+
+  if (src.startsWith("http://") || src.startsWith("https://")) {
+    const params = new URLSearchParams({ url: src });
+    return `/api/image-proxy?${params.toString()}`;
+  }
+
+  return src;
+}
 
   function updateItem(id: string, patch: Partial<Item>) {
     setItems((prev: Item[]) => prev.map((i) => (i.id === id ? ({ ...i, ...patch } as Item) : i)));

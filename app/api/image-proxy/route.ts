@@ -10,40 +10,30 @@ export async function GET(req: NextRequest) {
     }
 
     const imageUrl = decodeURIComponent(rawUrl);
-    console.log("image-proxy fetching:", imageUrl);
 
-    const upstream = await fetch(imageUrl, {
-      method: "GET",
+    const res = await fetch(imageUrl, {
       headers: {
         Accept: "image/*",
       },
-      cache: "no-store",
     });
 
-    if (!upstream.ok) {
-      const text = await upstream.text();
-      console.error("Upstream fetch failed:", upstream.status, text);
-
-      return new NextResponse(
-        `Upstream fetch failed: ${upstream.status}\n${text}`,
-        { status: upstream.status }
-      );
+    if (!res.ok) {
+      return new NextResponse("Upstream image fetch failed", { status: res.status });
     }
 
-    const contentType = upstream.headers.get("content-type") || "image/jpeg";
-    const buffer = await upstream.arrayBuffer();
+    const contentType = res.headers.get("content-type") || "image/png";
+    const arrayBuffer = await res.arrayBuffer();
 
-    return new NextResponse(buffer, {
+    return new NextResponse(arrayBuffer, {
       status: 200,
       headers: {
         "Content-Type": contentType,
+        "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=86400",
       },
     });
-  } catch (error: any) {
-    console.error("image-proxy error:", error);
-    return new NextResponse(`Proxy failed: ${error?.message || "unknown error"}`, {
-      status: 500,
-    });
+  } catch (err) {
+    console.error("image-proxy failed:", err);
+    return new NextResponse("Proxy failed", { status: 500 });
   }
 }
