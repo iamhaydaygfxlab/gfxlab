@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-
+import Link from "next/link";
+import { Capacitor } from "@capacitor/core";
 export default function HomePage() {
   const router = useRouter();
+  const isNative = Capacitor.getPlatform() !== "web";
 
   return (
     <>
@@ -49,11 +51,11 @@ export default function HomePage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-        backgroundImage:
-  "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url('/background.jpg')",
-backgroundSize: "cover",
-backgroundPosition: "center",
-backgroundRepeat: "no-repeat",
+          backgroundImage:
+            "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url('/background.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
           padding: "24px",
         }}
       >
@@ -63,7 +65,7 @@ backgroundRepeat: "no-repeat",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: "10px",
+            gap: "14px",
             animation: "fadeUp 0.8s ease-out",
           }}
         >
@@ -117,8 +119,35 @@ backgroundRepeat: "no-repeat",
                 pointerEvents: "none",
               }}
             />
-            <span style={{ position: "relative", zIndex: 1 }}>Enter the Lab</span>
+            <span style={{ position: "relative", zIndex: 1 }}>
+              Enter the Lab
+            </span>
           </button>
+
+         {!isNative && (
+  <Link
+    href="/custom"
+    style={{
+      width: "220px",
+      height: "50px",
+      borderRadius: "14px",
+      border: "1px solid rgba(255,255,255,0.18)",
+     background:
+                "linear-gradient(90deg, rgba(209,177,90,0.95) 0%, rgba(120,92,35,0.9) 45%, rgba(0,0,0,0.95) 100%)",
+              
+      color: "#ffffff",
+      fontWeight: 700,
+      fontSize: "16px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      textDecoration: "none",
+      backdropFilter: "blur(4px)",
+    }}
+  >
+    CUSTOM FROM 
+  </Link>
+)}
         </div>
       </main>
     </>
