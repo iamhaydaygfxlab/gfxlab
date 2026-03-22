@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "GFXlab",
     description:
-      "Create covers, flyers, and visuals in seconds. Add music and export for just $5–$8.",
+      "Create covers, flyers, and visuals n seconds. Add music and export for just $5–$8.",
     url: "https://gfxlab.vercel.app",
     siteName: "GFXlab",
     images: [
