@@ -1223,7 +1223,7 @@ async function makeAiBackground() {
 
     const size = preset.w >= preset.h ? "1536x1024" : "1024x1536";
 
-    const res = await fetch("/api/ai/background", {
+    const res = await fetch(api("/api/ai/background"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: idea, size }),
