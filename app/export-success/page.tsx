@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function ExportSuccessPage() {
+function ExportSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
 
@@ -91,5 +92,13 @@ export default function ExportSuccessPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function ExportSuccessPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 24, color: "#fff" }}>Loading...</div>}>
+      <ExportSuccessContent />
+    </Suspense>
   );
 }
