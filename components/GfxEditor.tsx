@@ -884,7 +884,15 @@ async function pickMusicFromDevice() {
 
     if (platform === "ios" || platform === "android") {
       const result = await FilePicker.pickFiles({
-        types: ["audio/*"],
+        types: [
+          "audio/mpeg",
+          "audio/mp3",
+          "audio/wav",
+          "audio/x-wav",
+          "audio/mp4",
+          "audio/m4a",
+          "public.audio",
+        ],
         readData: true,
       });
 
@@ -921,7 +929,7 @@ async function pickMusicFromDevice() {
 
     document.getElementById("music-upload-input")?.click();
   } catch (err) {
-    console.error(err);
+    console.error("Music picker failed:", err);
     alert("Could not pick music file.");
   }
 }
@@ -2772,7 +2780,7 @@ return (
     <input
       id="music-upload-input"
       type="file"
-      accept="audio/*"
+      accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
       style={{ display: "none" }}
       onChange={(e) => {
         const file = e.target.files?.[0];

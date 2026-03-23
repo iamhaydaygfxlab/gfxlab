@@ -132,7 +132,7 @@ useEffect(() => {
         Upload Music
         <input
           type="file"
-          accept="audio/*"
+          accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
           style={{ display: "none" }}
           onChange={handleFileChange}
         />
