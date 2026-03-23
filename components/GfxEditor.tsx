@@ -377,7 +377,7 @@ export default function GfxEditor() {
   const [projectName, setProjectName] = useState("Untitled Design");
   const [saving, setSaving] = useState(false);
   const [projectType, setProjectType] = useState<ProjectType>("cover");
-
+const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const presets =
     projectType === "cover"
       ? COVER_PRESETS
@@ -1669,19 +1669,21 @@ async function exportVideoFile() {
       ctx.clearRect(0, 0, preset.w, preset.h);
       ctx.drawImage(img, 0, 0, preset.w, preset.h);
 
-      const finalDataUrl = canvas.toDataURL("image/png");
-      const a = document.createElement("a");
-      a.href = finalDataUrl;
-      a.download =
-        projectType === "cover"
-          ? "gfxlab-cover.png"
-          : projectType === "flyer"
-          ? "gfxlab-flyer.png"
-          : "gfxlab-social.png";
+  const finalDataUrl = canvas.toDataURL("image/png");
+setDownloadUrl(finalDataUrl);
 
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+const a = document.createElement("a");
+a.href = finalDataUrl;
+a.download =
+  projectType === "cover"
+    ? "gfxlab-cover.png"
+    : projectType === "flyer"
+    ? "gfxlab-flyer.png"
+    : "gfxlab-social.png";
+
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
     } catch (err) {
       console.error("Export failed:", err);
       alert("Export failed.");
@@ -1713,7 +1715,6 @@ async function handleExport() {
 
   // 👉 Web flow continues here
 
-
   const uid =
     currentUser?.uid ||
     (typeof window !== "undefined"
@@ -1727,6 +1728,7 @@ async function handleExport() {
   await saveCurrentDesignForCheckout();
   window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}`;
 }
+
 async function handleMusicExport() {
   if (!musicFile) {
     alert("Upload music first.");
@@ -1738,7 +1740,6 @@ async function handleMusicExport() {
 
   if (isNativeMobile) {
     try {
-      alert("About to start native purchase: export_with_music");
       await startPurchaseFlow("export_with_music");
     } catch (err: any) {
       console.error(err);
@@ -2649,36 +2650,54 @@ return (
                 </>
               )}
 
-              {tab === "export" && (
-                <div style={{ padding: 12, display: "grid", gap: 12 }}>
-                  <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
+             {tab === "export" && (
+  <div style={{ padding: 12, display: "grid", gap: 12 }}>
+    <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
 
-                  <button style={tileBtn} onClick={handleExport}>
-                    Export Image Only $5
-                  </button>
+    <button style={tileBtn} onClick={handleExport}>
+      Export Image Only $5
+    </button>
 
-                  <div
-                    style={{
-                      height: 1,
-                      background: "rgba(255,255,255,0.12)",
-                      margin: "4px 0",
-                    }}
-                  />
+    {downloadUrl && (
+      <a
+        href={downloadUrl}
+        download={
+          projectType === "cover"
+            ? "gfxlab-cover.png"
+            : projectType === "flyer"
+            ? "gfxlab-flyer.png"
+            : "gfxlab-social.png"
+        }
+        style={{
+          display: "block",
+          marginTop: "10px",
+          padding: "14px 16px",
+          textAlign: "center",
+          borderRadius: "12px",
+          textDecoration: "none",
+          fontWeight: 900,
+          background: "linear-gradient(90deg, gold, #d4af37)",
+          color: "#000",
+          border: "1px solid rgba(255,255,255,0.18)",
+        }}
+      >
+        Download Your Design
+      </a>
+    )}
 
-                  <div style={{ fontWeight: 900, fontSize: 15 }}>Add Music for Video Export</div>
+    <div
+      style={{
+        height: 1,
+        background: "rgba(255,255,255,0.12)",
+        margin: "4px 0",
+      }}
+    />
 
-                  <MusicClipPicker
-                    musicUrl={musicUrl}
-                    clipStart={clipStart}
-                    clipDuration={clipDuration}
-                    onMusicChange={handleMusicChange}
-                  />
-
-                  <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
-                    Export image with Music $8 
-                  </button>
-                </div>
-              )}
+    <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
+      Export With Music $8
+    </button>
+  </div>
+)}
             </div>
           </div>
         </div>
