@@ -56,8 +56,8 @@ function ExportSuccessContent() {
             lineHeight: 1.5,
           }}
         >
-          Your payment went through. Tap the button below to return to the editor
-          and finish your export.
+          Your payment went through BOOM!!. When you return to the page you edit will be in "EXPORT" 
+          hold down the image  and save it THANK YOU !! 
         </p>
 
         <Link
