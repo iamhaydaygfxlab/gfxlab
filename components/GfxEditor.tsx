@@ -1696,13 +1696,13 @@ async function exportVideoFile() {
 
 async function handleExport() {
   const platform = Capacitor.getPlatform();
-  alert(`handleExport platform: ${platform}`);
+  console.log("platform:", platform);
 
-  const isNativeMobile = platform === "android" || platform === "ios";
+  const isNativeMobile =
+    platform === "android" || platform === "ios";
 
   if (isNativeMobile) {
     try {
-      alert("About to start native purchase: export_image");
       await startPurchaseFlow("export_image");
     } catch (err: any) {
       console.error(err);
@@ -1710,6 +1710,9 @@ async function handleExport() {
     }
     return;
   }
+
+  // 👉 Web flow continues here
+
 
   const uid =
     currentUser?.uid ||
