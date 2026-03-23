@@ -12,6 +12,7 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "@capacitor/ios": "^8.2.0",
+    "@capawesome/capacitor-file-picker": "^8.0.2",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@imgly/background-removal": "^1.7.0",
     "@revenuecat/purchases-capacitor": "^12.2.4",

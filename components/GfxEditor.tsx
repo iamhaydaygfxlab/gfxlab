@@ -27,6 +27,7 @@ import LayersPanel from "./LayersPanel";
 import { type FireTemplate } from "@/lib/templates";
 import MusicClipPicker from "./MusicClipPicker";
 import { Capacitor } from "@capacitor/core";
+import { FilePicker } from "@capawesome/capacitor-file-picker";
 
 
 
@@ -877,7 +878,53 @@ function toSafeSrc(src: string) {
     setClipStart(start);
     setClipDuration(duration);
   }
+async function pickMusicFromDevice() {
+  try {
+    const platform = Capacitor.getPlatform();
 
+    if (platform === "ios" || platform === "android") {
+      const result = await FilePicker.pickFiles({
+        types: ["audio/*"],
+        readData: true,
+      });
+
+      const picked = result.files?.[0];
+      if (!picked) return;
+
+      const fileName = picked.name || "audio-file";
+      const mimeType = picked.mimeType || "audio/mpeg";
+
+      if (!picked.data) {
+        alert("Could not read that audio file.");
+        return;
+      }
+
+      const response = await fetch(`data:${mimeType};base64,${picked.data}`);
+      const blob = await response.blob();
+      const file = new File([blob], fileName, { type: mimeType });
+      const url = URL.createObjectURL(file);
+
+      setMusicFile(file);
+      setMusicPreviewUrl(url);
+      setMusicUrl(url);
+      setClipStart(0);
+      setClipDuration(30);
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = url;
+        audioRef.current.currentTime = 0;
+      }
+
+      return;
+    }
+
+    document.getElementById("music-upload-input")?.click();
+  } catch (err) {
+    console.error(err);
+    alert("Could not pick music file.");
+  }
+}
   async function uploadMusicToFirebase(file: File): Promise<string> {
     const storage = getStorage(app);
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -2717,7 +2764,7 @@ return (
 
     <button
       style={tileBtn}
-      onClick={() => document.getElementById("music-upload-input")?.click()}
+      onClick={pickMusicFromDevice}
     >
       {musicFile ? "Change Music" : "Upload Music"}
     </button>
