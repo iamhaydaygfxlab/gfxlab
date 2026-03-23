@@ -2658,38 +2658,48 @@ return (
       Export Image Only $5
     </button>
 
-    {downloadUrl && (
-  <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-    <button
-      onClick={() => {
-        window.open(downloadUrl, "_blank");
-      }}
-      style={{
-        display: "block",
-        width: "100%",
-        padding: "14px 16px",
-        textAlign: "center",
-        borderRadius: "12px",
-        textDecoration: "none",
-        fontWeight: 900,
-        background: "linear-gradient(90deg, gold, #d4af37)",
-        color: "#000",
-        border: "1px solid rgba(255,255,255,0.18)",
-        cursor: "pointer",
-      }}
-    >
-      Open Your Design
-    </button>
-
+{downloadUrl && (
+  <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
     <div
       style={{
-        fontSize: 12,
-        lineHeight: 1.4,
-        color: "rgba(255,255,255,0.72)",
-        textAlign: "center",
+        padding: "12px",
+        borderRadius: "12px",
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.12)",
       }}
     >
-      iPhone users: your design may open in a new tab. Tap and hold the image to save it.
+      <div
+        style={{
+          fontWeight: 800,
+          marginBottom: 10,
+          textAlign: "center",
+          color: "#fff",
+        }}
+      >
+        Your Design Is Ready
+      </div>
+
+      <img
+        src={downloadUrl}
+        alt="Your exported design"
+        style={{
+          width: "100%",
+          borderRadius: "10px",
+          display: "block",
+        }}
+      />
+
+      <div
+        style={{
+          fontSize: 12,
+          lineHeight: 1.4,
+          color: "rgba(255,255,255,0.75)",
+          textAlign: "center",
+          marginTop: 10,
+        }}
+      >
+        iPhone users: tap and hold the image above to save it.
+      </div>
     </div>
   </div>
 )}
