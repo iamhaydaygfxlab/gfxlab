@@ -30,6 +30,7 @@ import { Capacitor } from "@capacitor/core";
 
 
 
+
 async function ensureFontLoaded(fontFamily: string) {
   if (!fontFamily) return;
   const fonts = (document as any).fonts;
@@ -390,7 +391,12 @@ const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     () => ALL_PRESETS.find((x) => x.id === presetId) ?? presets[0],
     [presetId, presets]
   );
+const [musicFile, setMusicFile] = useState<File | null>(null);
+const [musicPreviewUrl, setMusicPreviewUrl] = useState("");
+const [clipStart, setClipStart] = useState(0);
+const [clipDuration, setClipDuration] = useState(30);
 
+const audioRef = useRef<HTMLAudioElement | null>(null);
   const [items, setItems] = useState<Item[]>([defaultText()]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bgSrc, setBgSrc] = useState<string | null>(null);
@@ -509,10 +515,10 @@ const layers = useMemo(() => {
     else delete nodeMapRef.current[id];
   }, []);
 
-  const [musicFile, setMusicFile] = useState<File | null>(null);
+
   const [musicUrl, setMusicUrl] = useState("");
-  const [clipStart, setClipStart] = useState(0);
-  const [clipDuration, setClipDuration] = useState(30);
+
+
   const [uploadedAudioUrl, setUploadedAudioUrl] = useState("");
 
   function snapshotNow(): Snapshot {
@@ -2649,9 +2655,8 @@ return (
                   </div>
                 </>
               )}
-
-             {tab === "export" && (
-  <div style={{ padding: 12, display: "grid", gap: 12 }}>
+{tab === "export" && (
+  <div style={{ padding: 12, display: "grid", gap: 16 }}>
     <div style={{ fontWeight: 900, fontSize: 16 }}>Export Options</div>
 
     <button style={tileBtn} onClick={handleExport}>
@@ -2659,47 +2664,45 @@ return (
     </button>
 
     {downloadUrl && (
-      <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+      <div
+        style={{
+          padding: "12px",
+          borderRadius: "12px",
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.12)",
+        }}
+      >
         <div
           style={{
-            padding: "12px",
-            borderRadius: "12px",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.12)",
+            fontWeight: 800,
+            marginBottom: 10,
+            textAlign: "center",
+            color: "#fff",
           }}
         >
-          <div
-            style={{
-              fontWeight: 800,
-              marginBottom: 10,
-              textAlign: "center",
-              color: "#fff",
-            }}
-          >
-            Your Design Is Ready
-          </div>
+          Your Design Is Ready
+        </div>
 
-          <img
-            src={downloadUrl}
-            alt="Your exported design"
-            style={{
-              width: "100%",
-              borderRadius: "10px",
-              display: "block",
-            }}
-          />
+        <img
+          src={downloadUrl}
+          alt="Your exported design"
+          style={{
+            width: "100%",
+            borderRadius: "10px",
+            display: "block",
+          }}
+        />
 
-          <div
-            style={{
-              fontSize: 12,
-              lineHeight: 1.4,
-              color: "rgba(255,255,255,0.75)",
-              textAlign: "center",
-              marginTop: 10,
-            }}
-          >
-            iPhone users: tap and hold the image above to save it.
-          </div>
+        <div
+          style={{
+            fontSize: 12,
+            lineHeight: 1.4,
+            color: "rgba(255,255,255,0.75)",
+            textAlign: "center",
+            marginTop: 10,
+          }}
+        >
+          iPhone users: tap and hold the image above to save it.
         </div>
       </div>
     )}
@@ -2712,20 +2715,163 @@ return (
       }}
     />
 
-<button
-  style={{
-    ...tileBtn,
-    opacity: musicFile ? 1 : 0.55,
-    cursor: musicFile ? "pointer" : "not-allowed",
-  }}
-  onClick={() => {
-    if (!musicFile) {
-      alert("Upload a music file first.");
-      return;
-    }
-    handleMusicExport();
-  }}
->
+    <button
+      style={tileBtn}
+      onClick={() => document.getElementById("music-upload-input")?.click()}
+    >
+      {musicFile ? "Change Music" : "Upload Music"}
+    </button>
+
+    <input
+      id="music-upload-input"
+      type="file"
+      accept="audio/*"
+      style={{ display: "none" }}
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setMusicFile(file);
+
+        const url = URL.createObjectURL(file);
+        setMusicPreviewUrl(url);
+        setClipStart(0);
+        setClipDuration(30);
+
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.src = url;
+          audioRef.current.currentTime = 0;
+        }
+      }}
+    />
+
+    {musicPreviewUrl && (
+      <div
+        style={{
+          display: "grid",
+          gap: 12,
+          padding: "14px",
+          borderRadius: "14px",
+          background: "rgba(0,0,0,0.45)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          width: "100%",
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 800,
+            fontSize: 14,
+            textAlign: "center",
+            color: "#fff",
+          }}
+        >
+          Music Preview Settings
+        </div>
+
+        <div
+          style={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.72)",
+            textAlign: "center",
+            wordBreak: "break-word",
+          }}
+        >
+          Selected: {musicFile?.name}
+        </div>
+
+        <audio
+          ref={audioRef}
+          src={musicPreviewUrl}
+          onTimeUpdate={() => {
+            if (
+              audioRef.current &&
+              audioRef.current.currentTime >= clipStart + clipDuration
+            ) {
+              audioRef.current.pause();
+            }
+          }}
+          style={{ display: "none" }}
+        />
+
+        <button
+          style={tileBtn}
+          onClick={() => {
+            if (!audioRef.current) return;
+
+            if (!audioRef.current.paused) {
+              audioRef.current.pause();
+              return;
+            }
+
+            audioRef.current.currentTime = clipStart;
+            audioRef.current.play();
+          }}
+        >
+          {audioRef.current && !audioRef.current.paused
+            ? "Pause Preview"
+            : "Play Preview"}
+        </button>
+
+        <div style={{ display: "grid", gap: 8, width: "100%" }}>
+          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.78)" }}>
+            Start Time: {clipStart}s
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={60}
+            step={1}
+            value={clipStart}
+            onChange={(e) => {
+              const newStart = Number(e.target.value);
+              setClipStart(newStart);
+              if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = newStart;
+              }
+            }}
+            style={{ width: "100%" }}
+          />
+        </div>
+
+        <div style={{ display: "grid", gap: 8, width: "100%" }}>
+          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.78)" }}>
+            Preview Length: {clipDuration}s
+          </label>
+          <input
+            type="range"
+            min={5}
+            max={30}
+            step={1}
+            value={clipDuration}
+            onChange={(e) => {
+              const newDuration = Number(e.target.value);
+              setClipDuration(newDuration);
+              if (audioRef.current) {
+                audioRef.current.pause();
+              }
+            }}
+            style={{ width: "100%" }}
+          />
+        </div>
+      </div>
+    )}
+
+    <button
+      style={{
+        ...tileBtn,
+        opacity: musicFile ? 1 : 0.55,
+        cursor: musicFile ? "pointer" : "not-allowed",
+      }}
+      onClick={() => {
+        if (!musicFile) {
+          alert("Upload a music file first.");
+          return;
+        }
+        handleMusicExport();
+      }}
+    >
       Export With Music $8
     </button>
 
