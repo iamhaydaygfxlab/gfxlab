@@ -446,22 +446,22 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
   const sheetHeight =
     tab === "assets"
       ? isMobile
-        ? "min(420px, 28vh)"
+        ? "min(420px, 34vh)"
         : "min(360px, 30vh)"
       : tab === "text"
       ? isMobile
-        ? "min(420px, 28vh)"
+        ? "min(420px, 34vh)"
         : "min(360px, 30vh)"
       : tab === "adjust"
       ? isMobile
-        ? "min(360px, 28vh)"
+        ? "min(360px, 34vh)"
         : "min(300px, 34vh)"
       : tab === "layers"
       ? isMobile
-        ? "min(360px, 28vh)"
+        ? "min(360px, 34vh)"
         : "min(280px, 30vh)"
       : tab === "export"
-      ? "min(420px, 28vh)"
+      ? "min(420px, 34vh)"
       : "min(360px, 30vh)";
 
   const panelReserve =
