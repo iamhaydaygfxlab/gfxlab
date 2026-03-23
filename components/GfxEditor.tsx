@@ -2712,15 +2712,20 @@ return (
       }}
     />
 
-    <button
-      style={{
-        ...tileBtn,
-        opacity: musicFile ? 1 : 0.55,
-        cursor: musicFile ? "pointer" : "not-allowed",
-      }}
-      onClick={handleMusicExport}
-      disabled={!musicFile}
-    >
+<button
+  style={{
+    ...tileBtn,
+    opacity: musicFile ? 1 : 0.55,
+    cursor: musicFile ? "pointer" : "not-allowed",
+  }}
+  onClick={() => {
+    if (!musicFile) {
+      alert("Upload a music file first.");
+      return;
+    }
+    handleMusicExport();
+  }}
+>
       Export With Music $8
     </button>
 
