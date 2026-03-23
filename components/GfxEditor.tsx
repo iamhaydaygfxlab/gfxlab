@@ -2658,55 +2658,84 @@ return (
       Export Image Only $5
     </button>
 
-{downloadUrl && (
-  <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+    {downloadUrl && (
+      <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+        <div
+          style={{
+            padding: "12px",
+            borderRadius: "12px",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 800,
+              marginBottom: 10,
+              textAlign: "center",
+              color: "#fff",
+            }}
+          >
+            Your Design Is Ready
+          </div>
+
+          <img
+            src={downloadUrl}
+            alt="Your exported design"
+            style={{
+              width: "100%",
+              borderRadius: "10px",
+              display: "block",
+            }}
+          />
+
+          <div
+            style={{
+              fontSize: 12,
+              lineHeight: 1.4,
+              color: "rgba(255,255,255,0.75)",
+              textAlign: "center",
+              marginTop: 10,
+            }}
+          >
+            iPhone users: tap and hold the image above to save it.
+          </div>
+        </div>
+      </div>
+    )}
+
     <div
       style={{
-        padding: "12px",
-        borderRadius: "12px",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.12)",
+        height: 1,
+        background: "rgba(255,255,255,0.12)",
+        margin: "4px 0",
       }}
+    />
+
+    <button
+      style={{
+        ...tileBtn,
+        opacity: musicFile ? 1 : 0.55,
+        cursor: musicFile ? "pointer" : "not-allowed",
+      }}
+      onClick={handleMusicExport}
+      disabled={!musicFile}
     >
-      <div
-        style={{
-          fontWeight: 800,
-          marginBottom: 10,
-          textAlign: "center",
-          color: "#fff",
-        }}
-      >
-        Your Design Is Ready
-      </div>
+      Export With Music $8
+    </button>
 
-      <img
-        src={downloadUrl}
-        alt="Your exported design"
-        style={{
-          width: "100%",
-          borderRadius: "10px",
-          display: "block",
-        }}
-      />
-
+    {!musicFile && (
       <div
         style={{
           fontSize: 12,
           lineHeight: 1.4,
-          color: "rgba(255,255,255,0.75)",
+          color: "rgba(255,255,255,0.68)",
           textAlign: "center",
-          marginTop: 10,
         }}
       >
-        iPhone users: tap and hold the image above to save it.
+        Upload a music file first to enable music export.
       </div>
-    </div>
-  </div>
-)}
-
-    <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
-      Export With Music $8
-    </button>
+    )}
   </div>
 )}
             </div>
