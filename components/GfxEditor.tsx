@@ -2659,39 +2659,40 @@ return (
     </button>
 
     {downloadUrl && (
-      <a
-        href={downloadUrl}
-        download={
-          projectType === "cover"
-            ? "gfxlab-cover.png"
-            : projectType === "flyer"
-            ? "gfxlab-flyer.png"
-            : "gfxlab-social.png"
-        }
-        style={{
-          display: "block",
-          marginTop: "10px",
-          padding: "14px 16px",
-          textAlign: "center",
-          borderRadius: "12px",
-          textDecoration: "none",
-          fontWeight: 900,
-          background: "linear-gradient(90deg, gold, #d4af37)",
-          color: "#000",
-          border: "1px solid rgba(255,255,255,0.18)",
-        }}
-      >
-        Download Your Design
-      </a>
-    )}
+  <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+    <button
+      onClick={() => {
+        window.open(downloadUrl, "_blank");
+      }}
+      style={{
+        display: "block",
+        width: "100%",
+        padding: "14px 16px",
+        textAlign: "center",
+        borderRadius: "12px",
+        textDecoration: "none",
+        fontWeight: 900,
+        background: "linear-gradient(90deg, gold, #d4af37)",
+        color: "#000",
+        border: "1px solid rgba(255,255,255,0.18)",
+        cursor: "pointer",
+      }}
+    >
+      Open Your Design
+    </button>
 
     <div
       style={{
-        height: 1,
-        background: "rgba(255,255,255,0.12)",
-        margin: "4px 0",
+        fontSize: 12,
+        lineHeight: 1.4,
+        color: "rgba(255,255,255,0.72)",
+        textAlign: "center",
       }}
-    />
+    >
+      iPhone users: your design may open in a new tab. Tap and hold the image to save it.
+    </div>
+  </div>
+)}
 
     <button style={tileBtn} onClick={handleMusicExport} disabled={!musicFile}>
       Export With Music $8
