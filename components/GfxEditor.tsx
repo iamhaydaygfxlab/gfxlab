@@ -2213,7 +2213,7 @@ return (
   style={{
     ...smallHeaderBtn,
     background: "rgba(255,255,255,0.08)",
-    color: "#ffb3b3",
+    color: "#ff0000",
     border: "1px solid rgba(255,255,255,0.12)",
   }}
   onClick={handleStartFresh}
@@ -2329,7 +2329,7 @@ return (
       key={it.id}
       item={it}
       ratio={view.ratio}
-      onSelect={setSelectedId}
+      onSelect={handleSelectLayer}
       onUpdate={updateItem}
       onDragMove={(node: Konva.Node | null) => applySnapping(node)}
       onDragEnd={clearGuides}
@@ -2342,7 +2342,7 @@ return (
       ratio={view.ratio}
       canvasW={view.w}
       canvasH={view.h}
-      onSelect={setSelectedId}
+      onSelect={handleSelectLayer}
       onUpdate={updateItem}
       onDragMove={(node: Konva.Node | null) => applySnapping(node)}
       onDragEnd={clearGuides}
