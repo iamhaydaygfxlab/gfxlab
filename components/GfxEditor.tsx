@@ -1,5 +1,5 @@
 "use client";
-
+  
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Konva from "konva";
 import {
@@ -29,7 +29,7 @@ import MusicClipPicker from "./MusicClipPicker";
 import { Capacitor } from "@capacitor/core";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
 
-
+    "IMPORTS"  
 
 
 async function ensureFontLoaded(fontFamily: string) {
@@ -367,7 +367,7 @@ async function loadPendingMusicExport(): Promise<{
 async function deletePendingMusicExport() {
   await deletePendingDesign("gfxlab_pending_music_export");
 }
-
+"CONST"
 export default function GfxEditor() {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
@@ -424,6 +424,7 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
   const historyRef = useRef<Snapshot[]>([]);
   const historyIndexRef = useRef(-1);
   const restoringHistoryRef = useRef(false);
+  
 
   const pinchRef = useRef<
     | {
@@ -2127,7 +2128,9 @@ function handleDeleteLayer(id: string) {
 }
 
 function handleStartFresh() {
-  const ok = window.confirm("Start fresh? This will clear your current design.");
+  const ok = window.confirm(
+    "Are you sure you want to start over? This will clear your current design."
+  );
   if (!ok) return;
 
   trRef.current?.nodes([]);
@@ -2139,6 +2142,7 @@ function handleStartFresh() {
   setBgImg(null);
   setGuides([]);
   setMusicFile(null);
+  setMusicPreviewUrl("");
   setMusicUrl("");
   setClipStart(0);
   setClipDuration(30);
@@ -2147,7 +2151,6 @@ function handleStartFresh() {
   setProjectId(null);
   setTab("assets");
 }
-
 return (
     <div
   style={{
@@ -2194,6 +2197,8 @@ return (
             alt="GFXlab"
             style={{ height: 40, width: 40, objectFit: "contain", flexShrink: 0 }}
           />
+
+          "HEADER BUTTONS" 
           <button style={smallHeaderBtn} onClick={undo} disabled={historyIndexRef.current <= 0}>
             Undo
           </button>
@@ -2204,6 +2209,17 @@ return (
           >
             Redo
           </button>
+          <button
+  style={{
+    ...smallHeaderBtn,
+    background: "rgba(255,255,255,0.08)",
+    color: "#ffb3b3",
+    border: "1px solid rgba(255,255,255,0.12)",
+  }}
+  onClick={handleStartFresh}
+>
+  Start Over
+</button>
         </div>
 
         <div

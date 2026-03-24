@@ -1,39 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const rawUrl = searchParams.get("url");
-
+    const rawUrl = req.nextUrl.searchParams.get("url");
     if (!rawUrl) {
-      return new NextResponse("Missing url", { status: 400 });
+      return NextResponse.json({ error: "Missing url" }, { status: 400 });
     }
 
-    const imageUrl = decodeURIComponent(rawUrl);
+    const target = new URL(rawUrl);
 
-    const res = await fetch(imageUrl, {
-      headers: {
-        Accept: "image/*",
-      },
+    const upstream = await fetch(target.toString(), {
+      headers: { Accept: "image/*,*/*" },
+      cache: "no-store",
     });
 
-    if (!res.ok) {
-      return new NextResponse("Upstream image fetch failed", { status: res.status });
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => "");
+      return NextResponse.json(
+        {
+          error: "Upstream image fetch failed",
+          status: upstream.status,
+          statusText: upstream.statusText,
+          body: text,
+          url: target.toString(),
+        },
+        { status: 400 }
+      );
     }
 
-    const contentType = res.headers.get("content-type") || "image/png";
-    const arrayBuffer = await res.arrayBuffer();
+    const contentType = upstream.headers.get("content-type") || "image/png";
+    const bytes = await upstream.arrayBuffer();
 
-    return new NextResponse(arrayBuffer, {
+    return new NextResponse(bytes, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=86400",
       },
     });
-  } catch (err) {
-    console.error("image-proxy failed:", err);
-    return new NextResponse("Proxy failed", { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message || "Proxy failed" },
+      { status: 500 }
+    );
   }
 }
