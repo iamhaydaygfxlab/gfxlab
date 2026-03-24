@@ -2152,12 +2152,18 @@ function handleStartFresh() {
   setTab("assets");
 }
 return (
-    <div
-  style={{
-    ...screen,
-    paddingTop: "max(env(safe-area-inset-top), 20px)",
-  }}
->
+  <div
+    style={{
+      ...screen,
+      width: "100%",
+      minHeight: "100dvh",
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+      paddingTop: "max(env(safe-area-inset-top), 20px)",
+      boxSizing: "border-box",
+    }}
+  >
 <div
   style={{
     ...header,
@@ -2981,21 +2987,23 @@ function TabBtn({
     <button
       onClick={onClick}
       style={{
-        flex: 1,
-        minWidth: 0,
-        height: 30,
-        margin: "0 4px",
-        borderRadius: 12,
-        border: active ? "1px solid rgba(0,0,0,0.15)" : "1px solid transparent",
-        background: active ? "rgba(255,255,255,0.28)" : "transparent",
-        color: active ? "#d1b15a" : "white",
-        fontWeight: 900,
-        fontSize: 13,
-        opacity: active ? 1 : 0.72,
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        transition: "all 0.18s ease",
-      }}
+  flex: "1 1 90px", // 👈 makes it responsive
+  minWidth: 80,
+  height: 34,
+  margin: "4px",
+  borderRadius: 12,
+  border: active
+    ? "1px solid rgba(0,0,0,0.15)"
+    : "1px solid transparent",
+  background: active ? "rgba(255,255,255,0.28)" : "transparent",
+  color: active ? "#d1b15a" : "white",
+  fontWeight: 900,
+  fontSize: 13,
+  opacity: active ? 1 : 0.72,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  transition: "all 0.18s ease",
+}}
     >
       {label}
     </button>
@@ -3428,23 +3436,15 @@ const canvasWrap: React.CSSProperties = {
   touchAction: "none",
 };
 
-const tabBar: React.CSSProperties = {
-  height: 64,
+const tabBar = {
   display: "flex",
+  flexWrap: "wrap" as const,
+  gap: 8,
+  padding: "8px 10px",
+  justifyContent: "space-between",
   alignItems: "center",
-  padding: "0 8px",
-  borderTop: "1px solid rgba(255,255,255,0.08)",
-  backgroundImage: "url('/gold-texture.jpg')",
-  backgroundSize: "cover",
-  backgroundBlendMode: "overlay",
-  backgroundColor: "rgba(0,0,0,0.65)",
-  backgroundPosition: "center",
-  position: "fixed",
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 20,
-  boxShadow: "0 -6px 20px rgba(0,0,0,0.35)",
+  width: "100%",
+  boxSizing: "border-box" as const,
 };
 
 const sheetWrapBase: React.CSSProperties = {
@@ -3499,7 +3499,7 @@ const sheetHeader: React.CSSProperties = {
 
 const row: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
   gap: 10,
   padding: 12,
 };
