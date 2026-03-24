@@ -2198,7 +2198,7 @@ return (
             style={{ height: 40, width: 40, objectFit: "contain", flexShrink: 0 }}
           />
 
-          "HEADER BUTTONS" 
+    
           <button style={smallHeaderBtn} onClick={undo} disabled={historyIndexRef.current <= 0}>
             Undo
           </button>
