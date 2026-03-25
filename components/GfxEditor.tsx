@@ -465,11 +465,11 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
       ? "min(420px, 34vh)"
       : "min(360px, 30vh)";
 
-  const panelReserve =
-    tab !== "none" ? (isMobile ? 220 : 150) : isMobile ? 24 : 0;
+const panelReserve =
+  tab !== "none" ? (isMobile ? 170 : 130) : isMobile ? 16 : 0;
 
-  const workspacePadding = isMobile ? 16 : 26;
-  const artboardPadding = isMobile ? 26 : 40;
+const workspacePadding = isMobile ? 10 : 20;
+const artboardPadding = isMobile ? 14 : 28;
 
   const view = useMemo(() => {
     const safeW = Math.max(260, hostSize.w - workspacePadding * 2);
@@ -659,11 +659,11 @@ useEffect(() => {
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => {
-    setStageScale(1);
-    setStagePos({ x: 0, y: 0 });
-    pinchRef.current = null;
-  }, [presetId, hostSize.w, hostSize.h, tab]);
+useEffect(() => {
+  setStageScale(1);
+  setStagePos({ x: 0, y: 0 });
+  pinchRef.current = null;
+}, [presetId, hostSize.w, hostSize.h]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2224,7 +2224,7 @@ return (
   }}
   onClick={handleStartFresh}
 >
-  Start Over
+ RESET
 </button>
         </div>
 
@@ -3217,9 +3217,10 @@ function CanvasImageItem({
     const hdr = adj.hdr ?? 0;
     const sharpen = adj.sharpen ?? 0;
     const curvePreset = adj.curvePreset ?? "none";
-
-    node.clearCache();
-    node.cache();
+node.clearCache();
+node.cache({
+  pixelRatio: 2,
+});
 
     node.filters([
       Konva.Filters.Brighten,
