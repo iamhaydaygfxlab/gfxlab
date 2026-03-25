@@ -2463,7 +2463,7 @@ return (
                   </div>
 
                   <div style={{ padding: "10px 10px 0" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div style={{ display: "grid",gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
                       <button onClick={saveProject} style={btnTile}>
                         {saving ? "Saving..." : projectId ? "Saved" : "Save Design"}
                       </button>
@@ -2986,11 +2986,11 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
-      style={{
-  flex: "1 1 90px", // 👈 makes it responsive
-  minWidth: 80,
-  height: 34,
-  margin: "4px",
+    style={{
+  flex: 1,
+  minWidth: 0,
+  height: 30,
+  margin: "0 4px",
   borderRadius: 12,
   border: active
     ? "1px solid rgba(0,0,0,0.15)"
@@ -2998,10 +2998,12 @@ function TabBtn({
   background: active ? "rgba(255,255,255,0.28)" : "transparent",
   color: active ? "#d1b15a" : "white",
   fontWeight: 900,
-  fontSize: 13,
+  fontSize: 12,
   opacity: active ? 1 : 0.72,
   cursor: "pointer",
   whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
   transition: "all 0.18s ease",
 }}
     >
@@ -3436,15 +3438,26 @@ const canvasWrap: React.CSSProperties = {
   touchAction: "none",
 };
 
-const tabBar = {
+const tabBar: React.CSSProperties = {
+  height: 58,
   display: "flex",
-  flexWrap: "wrap" as const,
-  gap: 8,
-  padding: "8px 10px",
-  justifyContent: "space-between",
   alignItems: "center",
-  width: "100%",
-  boxSizing: "border-box" as const,
+  justifyContent: "space-between",
+  gap: 0,
+  padding: "0 8px max(env(safe-area-inset-bottom), 0px)",
+  borderTop: "1px solid rgba(255,255,255,0.08)",
+  backgroundImage: "url('/gold-texture.jpg')",
+  backgroundSize: "cover",
+  backgroundBlendMode: "overlay",
+  backgroundColor: "rgba(0,0,0,0.65)",
+  backgroundPosition: "center",
+  position: "fixed",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 20,
+  boxShadow: "0 -6px 20px rgba(0,0,0,0.35)",
+  boxSizing: "border-box",
 };
 
 const sheetWrapBase: React.CSSProperties = {
