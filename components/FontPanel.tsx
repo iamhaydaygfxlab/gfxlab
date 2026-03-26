@@ -12,7 +12,7 @@ const FONT_OPTIONS = [
   { name: "Courier New", family: "Courier New" },
   { name: "Blank River", family: "Blank River" },
 ];
-const [showFontMenu, setShowFontMenu] = React.useState(false);
+
 
 export type TextSettings = {
   text: string;
@@ -64,6 +64,7 @@ export default function FontPanel({
   value: TextSettings;
   onChange: (next: TextSettings) => void;
 }) {
+  const [showFontMenu, setShowFontMenu] = React.useState(false);
   function patch(p: Partial<TextSettings>) {
     onChange({ ...value, ...p });
   }
