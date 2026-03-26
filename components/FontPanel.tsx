@@ -1,6 +1,17 @@
 "use client";
 
 import React from "react";
+const FONT_OPTIONS = [
+  { name: "Impact", family: "Impact" },
+  { name: "Arial", family: "Arial" },
+  { name: "Helvetica", family: "Helvetica" },
+  { name: "Times New Roman", family: "Times New Roman" },
+  { name: "Georgia", family: "Georgia" },
+  { name: "Verdana", family: "Verdana" },
+  { name: "Trebuchet MS", family: "Trebuchet MS" },
+  { name: "Courier New", family: "Courier New" },
+  { name: "Blank River", family: "Blank River" },
+];
 
 export type TextSettings = {
   text: string;
@@ -55,6 +66,9 @@ export default function FontPanel({
   function patch(p: Partial<TextSettings>) {
     onChange({ ...value, ...p });
   }
+  function chooseFont(fontFamily: string) {
+  onChange({ ...value, fontFamily });
+}
 
   return (
   <div style={wrap}>
@@ -75,21 +89,27 @@ export default function FontPanel({
       <div className="grid2-stack" style={grid2}>
         <div>
           <div style={label}>Font</div>
-          <select
-  value={value.fontFamily}
-  onChange={(e) => onChange({ ...value, fontFamily: e.target.value })}
-  style={input}
->
-  <option value="Impact">Impact</option>
-  <option value="Arial">Arial</option>
-  <option value="Helvetica">Helvetica</option>
-  <option value="Times New Roman">Times New Roman</option>
-  <option value="Georgia">Georgia</option>
-  <option value="Verdana">Verdana</option>
-  <option value="Trebuchet MS">Trebuchet MS</option>
-  <option value="Courier New">Courier New</option>
-   <option value="Blank River">Blank River</option>
-</select>
+         <div style={fontList}>
+  {FONT_OPTIONS.map((font) => {
+    const active = value.fontFamily === font.family;
+
+    return (
+      <button
+        key={font.family}
+        type="button"
+        onClick={() => chooseFont(font.family)}
+        style={{
+          ...fontOptionBtn,
+          ...(active ? fontOptionBtnActive : {}),
+          fontFamily: font.family,
+        }}
+      >
+        <div style={{ fontSize: 20, lineHeight: 1.1 }}>Create</div>
+        <div style={fontMeta}>{font.name}</div>
+      </button>
+    );
+  })}
+</div>
         </div>
 
         <div>
@@ -523,3 +543,37 @@ const mediaGridCss = `
 const sectionTitle: React.CSSProperties = { fontWeight: 1000 as any, marginBottom: 8, fontSize: 13 };
 
 const checkRow: React.CSSProperties = { display: "flex", gap: 8, alignItems: "center", fontSize: 12, opacity: 0.92 };
+
+const fontList: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: 8,
+  maxHeight: 240,
+  overflowY: "auto",
+  paddingRight: 2,
+};
+
+const fontOptionBtn: React.CSSProperties = {
+  width: "100%",
+  textAlign: "left",
+  padding: "12px 14px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(0,0,0,0.25)",
+  color: "white",
+  cursor: "pointer",
+  outline: "none",
+};
+
+const fontOptionBtnActive: React.CSSProperties = {
+  border: "1px solid rgba(209,177,90,0.95)",
+  background: "rgba(209,177,90,0.12)",
+  boxShadow: "0 0 0 1px rgba(209,177,90,0.18) inset",
+};
+
+const fontMeta: React.CSSProperties = {
+  marginTop: 4,
+  fontSize: 11,
+  opacity: 0.75,
+  fontFamily: "Arial, sans-serif",
+};
