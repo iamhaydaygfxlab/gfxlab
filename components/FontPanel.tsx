@@ -12,6 +12,7 @@ const FONT_OPTIONS = [
   { name: "Courier New", family: "Courier New" },
   { name: "Blank River", family: "Blank River" },
 ];
+const [showFontMenu, setShowFontMenu] = React.useState(false);
 
 export type TextSettings = {
   text: string;
@@ -89,26 +90,58 @@ export default function FontPanel({
       <div className="grid2-stack" style={grid2}>
         <div>
           <div style={label}>Font</div>
-         <div style={fontList}>
-  {FONT_OPTIONS.map((font) => {
-    const active = value.fontFamily === font.family;
+         
+   <div style={{ display: "grid", gap: 8 }}>
+  <button
+  type="button"
+  onClick={() => setShowFontMenu((v) => !v)}
+  style={fontDropdownBtn}
+>
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-start",
+    }}
+  >
+    <span style={{ fontSize: 11, opacity: 0.7 }}>
+      Font
+    </span>
 
-    return (
-      <button
-        key={font.family}
-        type="button"
-        onClick={() => chooseFont(font.family)}
-        style={{
-          ...fontOptionBtn,
-          ...(active ? fontOptionBtnActive : {}),
-          fontFamily: font.family,
-        }}
-      >
-        <div style={{ fontSize: 20, lineHeight: 1.1 }}>Create</div>
-        <div style={fontMeta}>{font.name}</div>
-      </button>
-    );
-  })}
+    <span style={{ fontFamily: value.fontFamily, fontSize: 18 }}>
+      {value.fontFamily}
+    </span>
+  </div>
+
+  <span>{showFontMenu ? "▲" : "▼"}</span>
+</button>
+  {showFontMenu && (
+    <div style={fontList}>
+      {FONT_OPTIONS.map((font) => {
+        const active = value.fontFamily === font.family;
+
+        return (
+          <button
+            key={font.family}
+            type="button"
+            onClick={() => {
+              chooseFont(font.family);
+              setShowFontMenu(false);
+            }}
+            style={{
+              ...fontOptionBtn,
+              ...(active ? fontOptionBtnActive : {}),
+              fontFamily: font.family,
+            }}
+          >
+            <div style={{ fontSize: 20, lineHeight: 1.1 }}>Create</div>
+            <div style={fontMeta}>{font.name}</div>
+          </button>
+        );
+      })}
+    </div>
+  )}
+
 </div>
         </div>
 
@@ -576,4 +609,18 @@ const fontMeta: React.CSSProperties = {
   fontSize: 11,
   opacity: 0.75,
   fontFamily: "Arial, sans-serif",
+};
+
+const fontDropdownBtn: React.CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "12px 14px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(0,0,0,0.25)",
+  color: "white",
+  cursor: "pointer",
+  fontWeight: 800,
 };
