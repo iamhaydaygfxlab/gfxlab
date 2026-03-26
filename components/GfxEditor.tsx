@@ -29,7 +29,13 @@ import MusicClipPicker from "./MusicClipPicker";
 import { Capacitor } from "@capacitor/core";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
 
-    "IMPORTS"  
+const FONTS = [
+  { name: "Anton", family: "Anton" },
+  { name: "Montserrat", family: "Montserrat" },
+  { name: "Oswald", family: "Oswald" },
+  { name: "Playfair", family: "Playfair Display" },
+  { name: "Impact", family: "Impact" },
+];
 
 
 async function ensureFontLoaded(fontFamily: string) {
@@ -295,12 +301,6 @@ const SOCIAL_PRESETS: SizePreset[] = [
 ];
 
 const ALL_PRESETS: SizePreset[] = [...COVER_PRESETS, ...FLYER_PRESETS, ...SOCIAL_PRESETS];
-const MOTION_ASSETS = [
-  { id: "smoke", name: "Smoke", src: "/motion/smoke.mp4" },
-  { id: "rain", name: "Rain", src: "/motion/rain.mp4" },
-  { id: "fire", name: "Fire", src: "/motion/fire.mp4" },
-  { id: "sparkles", name: "Sparkles", src: "/motion/sparkles.mp4" },
-];
 
 function openGfxDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -2198,11 +2198,7 @@ return (
           <button style={iconBtn} onClick={() => window.history.back()} title="Back">
             ←
           </button>
-          <img
-            src="/gfxlab-icon.png"
-            alt="GFXlab"
-            style={{ height: 40, width: 40, objectFit: "contain", flexShrink: 0 }}
-          />
+    
 
     
           <button style={smallHeaderBtn} onClick={undo} disabled={historyIndexRef.current <= 0}>

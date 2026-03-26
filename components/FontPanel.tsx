@@ -11,6 +11,13 @@ const FONT_OPTIONS = [
   { name: "Trebuchet MS", family: "Trebuchet MS" },
   { name: "Courier New", family: "Courier New" },
   { name: "Blank River", family: "Blank River" },
+  { name: "Bebas Neue", family: "Bebas Neue" },
+  { name: "LEMON MILK", family: "LEMON MILK" },
+  { name: "DOLLAR BILL", family: "DOLLAR BILL" },
+  { name: "Another Danger", family: "Another Danger" },
+  { name: "Candlescript", family: "Candlescript" },
+  { name: "Graffiti", family: "Graffiti" },
+  { name: "Streamster", family: "Streamster" },
 ];
 
 

@@ -14,21 +14,55 @@ body {
 
 @font-face {
   font-family: "Anton";
-  src: url("/fonts/Anton-Regular.ttf") format("truetype");
+  src: url("/fonts/Anton-Regular.otf") format("truetype");
 }
 
 @font-face {
   font-family: "Bebas Neue";
-  src: url("/fonts/BebasNeue-Regular.ttf") format("truetype");
+  src: url("/fonts/BebasNeue-Regular.otf") format("truetype");
   
 }
 
 @font-face {
   font-family: "Montserrat";
-  src: url("/fonts/Montserrat-Bold.ttf") format("truetype");
+  src: url("/fonts/Montserrat-Bold.otf") format("truetype");
 }
 
 @font-face {
   font-family: "Blank River";
   src: url("/fonts/Blank River.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "LEMON MILK";
+  src: url("/fonts/LEMONMILK-Regular.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "DOLLAR BILL";
+  src: url("public/fonts/Dollar Bill.ttf") format("truetype");
+}
+
+
+@font-face {
+  font-family: "Candlescript";
+  src: url("public/fonts/Candlescript.otf") format("opentype");
+}
+
+
+@font-face {
+  font-family: "Graffiti";
+  src: url("public/fonts/SparticalGraffiti.otf") format("opentype");
+}
+
+
+@font-face {
+  font-family: "Another Danger";
+  src: url("public/fonts/Another Danger.otf") format("opentype");
+}
+
+
+@font-face {
+  font-family: "Streamster";
+  src: url("public/fonts/Streamster.ttf") format("truetype");
 }
