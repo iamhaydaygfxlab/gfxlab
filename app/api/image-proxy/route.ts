@@ -1,49 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
 export async function GET(req: NextRequest) {
   try {
-    const rawUrl = req.nextUrl.searchParams.get("url");
+    const { searchParams } = new URL(req.url);
+    const rawUrl = searchParams.get("url");
+
     if (!rawUrl) {
-      return NextResponse.json({ error: "Missing url" }, { status: 400 });
+      return new NextResponse("Missing url", { status: 400 });
     }
 
-    const target = new URL(rawUrl);
+    const imageUrl = decodeURIComponent(rawUrl);
 
-    const upstream = await fetch(target.toString(), {
-      headers: { Accept: "image/*,*/*" },
-      cache: "no-store",
+    const res = await fetch(imageUrl, {
+      headers: {
+        Accept: "image/*",
+      },
     });
 
-    if (!upstream.ok) {
-      const text = await upstream.text().catch(() => "");
-      return NextResponse.json(
-        {
-          error: "Upstream image fetch failed",
-          status: upstream.status,
-          statusText: upstream.statusText,
-          body: text,
-          url: target.toString(),
-        },
-        { status: 400 }
-      );
+    if (!res.ok) {
+      return new NextResponse("Upstream image fetch failed", { status: res.status });
     }
 
-    const contentType = upstream.headers.get("content-type") || "image/png";
-    const bytes = await upstream.arrayBuffer();
+    const contentType = res.headers.get("content-type") || "image/png";
+    const arrayBuffer = await res.arrayBuffer();
 
-    return new NextResponse(bytes, {
+    return new NextResponse(arrayBuffer, {
       status: 200,
       headers: {
         "Content-Type": contentType,
+        "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=86400",
       },
     });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || "Proxy failed" },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error("image-proxy failed:", err);
+    return new NextResponse("Proxy failed", { status: 500 });
   }
 }

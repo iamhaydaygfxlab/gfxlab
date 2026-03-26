@@ -2462,16 +2462,8 @@ return (
                     </select>
                   </div>
 
-                  <div style={{ padding: "10px 10px 0" }}>
-                    <div style={{ display: "grid",gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
-                      <button onClick={saveProject} style={btnTile}>
-                        {saving ? "Saving..." : projectId ? "Saved" : "Save Design"}
-                      </button>
-                      <button onClick={handleLogout} style={btnTile}>
-                        Logout
-                      </button>
-                    </div>
-                  </div>
+             
+            
 
                   <div style={assetsGrid}>
                     <label style={tileBtn}>
