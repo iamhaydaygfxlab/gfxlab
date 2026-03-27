@@ -6,13 +6,13 @@ import { fetchAssets, type AssetType, type FireAsset } from "@/lib/assets";
 export type AssetItem = { src: string; name?: string; type?: AssetType };
 
 const TABS: { key: AssetType; label: string }[] = [
-  { key: "background", label: "pre-made backgrounds" },
-  { key: "sticker", label: "Elements" },
-  { key: "texture", label: "Icons" },
-  { key: "cars", label: "Cars" },
-  { key: "effects", label: "Effects" },
+  { key: "background", label: "Backgrounds" },
+  { key: "sticker", label: "Effects" },
+  { key: "texture", label: "Icons/social" },
+  { key: "cars", label: "Vehicles" },
+  { key: "effects", label: "3D objects" },
 
-  { key: "money", label: "Money" },
+  { key: "money", label: "Luxury/Money" },
 ];
 
 function makeAssetUrl(path: string) {
