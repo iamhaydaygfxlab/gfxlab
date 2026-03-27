@@ -11,7 +11,7 @@ const PREFIXES: Array<{ prefix: string; type: string }> = [
   { prefix: "assets/textures/", type: "texture" },
   { prefix: "assets/cars/", type: "cars" },
   { prefix: "assets/effects/", type: "effects" },
-  { prefix: "assets/models/", type: "models" },
+ 
   { prefix: "assets/money/", type: "money" },
 ];
 

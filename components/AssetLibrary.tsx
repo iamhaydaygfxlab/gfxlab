@@ -11,7 +11,7 @@ const TABS: { key: AssetType; label: string }[] = [
   { key: "texture", label: "Icons" },
   { key: "cars", label: "Cars" },
   { key: "effects", label: "Effects" },
-  { key: "models", label: "Models" },
+
   { key: "money", label: "Money" },
 ];
 

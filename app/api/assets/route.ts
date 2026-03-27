@@ -5,7 +5,7 @@ import { app } from "@/lib/firebase";
 const CATEGORIES = [
   "money",
   "cars",
-  "models",
+  
   "effects",
   "shapes",
   "backgrounds",

@@ -1870,121 +1870,7 @@ function loadTemplate(template: FireTemplate) {
     setTab("text");
   }
 
-  function addArtistTemplate() {
-    const artist = makeTextItem({
-      text: "ARTIST NAME",
-      x: preset.w / 2,
-      y: preset.h * 0.15,
-      align: "center",
-      fontSize: preset.w * 0.09,
-      fontFamily: "Impact",
-      fontWeight: 900,
-      fill: "#ffffff",
-    });
-
-    const title = makeTextItem({
-      text: "Album Title",
-      x: Math.round(preset.w * 0.16),
-      y: Math.round(preset.h * 0.72),
-      fontSize: Math.round(preset.w * 0.06),
-      fontFamily: "Arial",
-      fontWeight: 700,
-      fill: "#d1b15a",
-    });
-
-    setItems((prev: Item[]) => [...prev, artist, title]);
-    setSelectedId(title.id);
-    setTab("text");
-  }
-
-  function addFlyerTemplate() {
-    const headline = makeTextItem({
-      text: "LIVE TONIGHT",
-      x: Math.round(preset.w * 0.12),
-      y: Math.round(preset.h * 0.12),
-      fontSize: Math.round(preset.w * 0.09),
-      fontFamily: "Impact",
-      fontWeight: 900,
-      fill: "#ffffff",
-    });
-
-    const sub = makeTextItem({
-      text: "DJ KAY",
-      x: Math.round(preset.w * 0.2),
-      y: Math.round(preset.h * 0.3),
-      fontSize: Math.round(preset.w * 0.075),
-      fontFamily: "Arial",
-      fontWeight: 800,
-      fill: "#d1b15a",
-    });
-
-    const details = makeTextItem({
-      text: "FRIDAY • 10PM • TACOMA",
-      x: Math.round(preset.w * 0.14),
-      y: Math.round(preset.h * 0.84),
-      fontSize: Math.round(preset.w * 0.04),
-      fontFamily: "Arial",
-      fontWeight: 700,
-      fill: "#ffffff",
-    });
-
-    setItems((prev: Item[]) => [...prev, headline, sub, details]);
-    setSelectedId(headline.id);
-    setTab("text");
-  }
-
-  function addQuoteTemplate() {
-    const quote = makeTextItem({
-      text: "YOUR QUOTE HERE",
-      x: Math.round(preset.w * 0.1),
-      y: Math.round(preset.h * 0.32),
-      fontSize: Math.round(preset.w * 0.055),
-      fontFamily: "Arial",
-      fontWeight: 800,
-      fill: "#ffffff",
-      align: "center",
-    });
-
-    const author = makeTextItem({
-      text: "- @username",
-      x: Math.round(preset.w * 0.28),
-      y: Math.round(preset.h * 0.68),
-      fontSize: Math.round(preset.w * 0.035),
-      fontFamily: "Arial",
-      fontWeight: 700,
-      fill: "#d1b15a",
-    });
-
-    setItems((prev: Item[]) => [...prev, quote, author]);
-    setSelectedId(quote.id);
-    setTab("text");
-  }
-
-  function addPodcastTemplate() {
-    const show = makeTextItem({
-      text: "PODCAST NAME",
-      x: Math.round(preset.w * 0.1),
-      y: Math.round(preset.h * 0.14),
-      fontSize: Math.round(preset.w * 0.075),
-      fontFamily: "Impact",
-      fontWeight: 900,
-      fill: "#ffffff",
-    });
-
-    const episode = makeTextItem({
-      text: "EPISODE 001",
-      x: Math.round(preset.w * 0.12),
-      y: Math.round(preset.h * 0.74),
-      fontSize: Math.round(preset.w * 0.045),
-      fontFamily: "Arial",
-      fontWeight: 700,
-      fill: "#d1b15a",
-    });
-
-    setItems((prev: Item[]) => [...prev, show, episode]);
-    setSelectedId(show.id);
-    setTab("text");
-  }
+ 
 
   function applyGlowText() {
     if (!selectedText) return;
@@ -2539,23 +2425,7 @@ return (
                     </button>
                   </div>
 
-                  <div style={{ padding: "0 12px 12px" }}>
-                    <div style={{ fontWeight: 900, marginBottom: 8 }}>Text Templates</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
-                      <button style={tileBtn} onClick={addArtistTemplate}>
-                        Artist + Title
-                      </button>
-                      <button style={tileBtn} onClick={addFlyerTemplate}>
-                        Event Flyer
-                      </button>
-                      <button style={tileBtn} onClick={addQuoteTemplate}>
-                        Social Quote
-                      </button>
-                      <button style={tileBtn} onClick={addPodcastTemplate}>
-                        Podcast Cover
-                      </button>
-                    </div>
-                  </div>
+                 
 
                   <div style={{ padding: "0 12px 12px" }}>
                     <div style={{ fontWeight: 900, marginBottom: 8 }}>Text Effects</div>

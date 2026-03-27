@@ -1,8 +1,7 @@
 export type AssetCategory =
   | "money"
   | "cars"
-  | "models"
-  | "effects"
+  |"effects"
   | "shapes"
   | "backgrounds";
 

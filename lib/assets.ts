@@ -7,7 +7,7 @@ export type AssetType =
   | "texture"
   | "cars"
   | "effects"
-  | "models"
+  
   | "money";
 
 export type FireAsset = {
