@@ -690,34 +690,7 @@ useEffect(() => {
 }, [projectName, projectType, presetId, bgSrc, items]);
 // ✅ LOGIN GATE (PUT EXACTLY HERE)
 
-if (!authChecked || !projectLoaded) {
-  return <div style={{ padding: 40, color: "#fff" }}>Loading...</div>;
-}
 
-if (!currentUser) {
-  return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#0b0b0b",
-        color: "#fff",
-      }}
-    >
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 22, fontWeight: 900 }}>
-          Sign in required
-        </div>
-
-        <button onClick={() => (window.location.href = "/login")}>
-          Log In
-        </button>
-      </div>
-    </div>
-  );
-}
   useEffect(() => {
     const currentPresetStillValid = presets.some((p) => p.id === presetId);
     if (!currentPresetStillValid) setPresetId(presets[0].id);
