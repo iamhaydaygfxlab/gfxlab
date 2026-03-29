@@ -1014,17 +1014,12 @@ useEffect(() => {
 
     return () => window.clearTimeout(t);
   }, [checkoutRestoreReady, bgImg, presetId, projectType, musicFile, clipStart, clipDuration]);
-
 function toSafeSrc(src: string) {
   if (
     src.startsWith("data:") ||
     src.startsWith("blob:") ||
     src.startsWith("/")
   ) {
-    return src;
-  }
-
-  if (src.includes("firebasestorage.googleapis.com")) {
     return src;
   }
 
