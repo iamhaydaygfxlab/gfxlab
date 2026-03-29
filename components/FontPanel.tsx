@@ -393,7 +393,12 @@ export default function FontPanel({
         <div className="grid2-stack" style={grid2}>
           <div>
             <div style={label}>Stroke Color</div>
-            <input value={value.strokeColor} onChange={(e) => patch({ strokeColor: e.target.value })} style={input} />
+           <input
+  type="color"
+  value={value.strokeColor}
+  onChange={(e) => patch({ strokeColor: e.target.value })}
+  style={{ ...input, height: 44, padding: 6 }}
+/>
           </div>
           <div>
             <div style={label}>Stroke Width</div>
@@ -425,7 +430,12 @@ export default function FontPanel({
         <div className="grid2-stack" style={grid2}>
           <div>
             <div style={label}>Shadow Color</div>
-            <input value={value.shadowColor} onChange={(e) => patch({ shadowColor: e.target.value })} style={input} />
+           <input
+  type="color"
+  value={value.shadowColor}
+  onChange={(e) => patch({ shadowColor: e.target.value })}
+  style={{ ...input, height: 44, padding: 6 }}
+/>
           </div>
           <div>
             <div style={label}>Blur</div>

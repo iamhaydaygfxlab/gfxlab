@@ -382,11 +382,85 @@ async function loadPendingMusicExport(): Promise<{
 async function deletePendingMusicExport() {
   await deletePendingDesign("gfxlab_pending_music_export");
 }
+async function trimTransparentImage(src: string): Promise<{
+  src: string;
+  width: number;
+  height: number;
+}> {
+  const img = await loadHtmlImage(src);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return { src, width: img.width, height: img.height };
+  }
+
+  ctx.drawImage(img, 0, 0);
+
+  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  let top = height;
+  let left = width;
+  let right = 0;
+  let bottom = 0;
+  let found = false;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = data[(y * width + x) * 4 + 3];
+      if (alpha > 8) {
+        found = true;
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+  }
+
+  if (!found) {
+    return { src, width: img.width, height: img.height };
+  }
+
+  const trimW = right - left + 1;
+  const trimH = bottom - top + 1;
+
+  const trimmedCanvas = document.createElement("canvas");
+  trimmedCanvas.width = trimW;
+  trimmedCanvas.height = trimH;
+
+  const trimmedCtx = trimmedCanvas.getContext("2d");
+  if (!trimmedCtx) {
+    return { src, width: img.width, height: img.height };
+  }
+
+  trimmedCtx.drawImage(
+    canvas,
+    left,
+    top,
+    trimW,
+    trimH,
+    0,
+    0,
+    trimW,
+    trimH
+  );
+
+  return {
+    src: trimmedCanvas.toDataURL("image/png"),
+    width: trimW,
+    height: trimH,
+  };
+}
 "CONST"
 export default function GfxEditor() {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -425,6 +499,8 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
   const [showUploadChoice, setShowUploadChoice] = useState(false);
 const [pendingFile, setPendingFile] = useState<File | null>(null);
 const [showBgChoice, setShowBgChoice] = useState(false);
+const [strokeColor, setStrokeColor] = useState("#000000");
+const [shadowColor, setShadowColor] = useState("#000000");
   
 
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -503,7 +579,7 @@ const artboardPadding = isMobile ? 14 : 28;
     const scaledRatio = Math.max(0.02, ratio);
     const w = Math.max(120, Math.round(preset.w * scaledRatio));
     const h = Math.max(120, Math.round(preset.h * scaledRatio));
-    const x = Math.round((hostSize.w - w) / 2);
+  const x = Math.round((hostSize.w - w) / 2) + (isDesktop ? 310 : 0);
     const y = workspacePadding + 10;
     return { w, h, ratio: scaledRatio, x, y };
   }, [hostSize, panelReserve, preset, workspacePadding, artboardPadding]);
@@ -594,6 +670,16 @@ const layers = useMemo(() => {
     pushHistory(snapshotNow());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, bgSrc, projectType, presetId]);
+  useEffect(() => {
+  const checkDesktop = () => {
+    setIsDesktop(window.innerWidth >= 900);
+  };
+
+  checkDesktop();
+  window.addEventListener("resize", checkDesktop);
+
+  return () => window.removeEventListener("resize", checkDesktop);
+}, []);
 
 useEffect(() => {
   const auth = getAuth(app);
@@ -1057,7 +1143,8 @@ async function pickMusicFromDevice() {
   async function addAssetToCanvas(asset: AssetItem) {
     try {
       const safeSrc = toSafeSrc(asset.src);
-      const img = await loadHtmlImage(safeSrc);
+      const trimmed = await trimTransparentImage(safeSrc);
+const img = await loadHtmlImage(trimmed.src);
       const isBackground = asset.type === "background";
 
       if (isBackground) {
@@ -1068,9 +1155,9 @@ async function pickMusicFromDevice() {
 
       const targetMaxW = Math.round(preset.w * 0.85);
       const targetMaxH = Math.round(preset.h * 0.85);
-      const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
-      const w = Math.max(60, Math.round(img.width * ratio));
-      const h = Math.max(60, Math.round(img.height * ratio));
+    const ratio = Math.min(targetMaxW / trimmed.width, targetMaxH / trimmed.height, 1);
+const w = Math.max(60, Math.round(trimmed.width * ratio));
+const h = Math.max(60, Math.round(trimmed.height * ratio));
 
       const imgItem: ImageItem = {
         id: uid(),
@@ -1078,7 +1165,7 @@ async function pickMusicFromDevice() {
         x: Math.round((preset.w - w) / 2),
         y: Math.round((preset.h - h) / 2),
         rotation: 0,
-        src: safeSrc,
+        src: trimmed.src,
         width: w,
         height: h,
         scale: 1,
@@ -1099,7 +1186,9 @@ async function pickMusicFromDevice() {
 
     reader.onload = async () => {
       try {
-        const src = String(reader.result);
+        const originalSrc = String(reader.result);
+const trimmed = await trimTransparentImage(originalSrc);
+const src = trimmed.src;
         const img = await loadHtmlImage(src);
         const targetMaxW = Math.round(preset.w * 0.7);
         const targetMaxH = Math.round(preset.h * 0.7);
@@ -1319,6 +1408,33 @@ async function pickMusicFromDevice() {
       window.location.href = "/login";
     }
   }
+function cleanForFirestore(value: any): any {
+  if (value === undefined) return null;
+
+  if (value === null) return null;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => cleanForFirestore(item));
+  }
+
+  if (typeof value === "object") {
+    const out: Record<string, any> = {};
+
+    for (const [key, val] of Object.entries(value)) {
+      if (typeof val === "function") continue;
+      if (val instanceof File) continue;
+      if (val instanceof Blob) continue;
+      if (typeof Image !== "undefined" && val instanceof Image) continue;
+
+      out[key] = cleanForFirestore(val);
+    }
+
+    return out;
+  }
+
+  return value;
+}
+
 async function saveProject() {
   try {
     const auth = getAuth(app);
@@ -1329,15 +1445,14 @@ async function saveProject() {
     setSaving(true);
 
     const payload = {
-      ownerUid: user.uid,
-      name: projectName,
-      projectType,
-      presetId,
-      bgSrc,
-      items,
-      updatedAt: serverTimestamp(),
-    };
-
+  ownerUid: user.uid,
+  name: projectName,
+  projectType,
+  presetId,
+  bgSrc: bgSrc ?? null,
+  items: cleanForFirestore(items),
+  updatedAt: serverTimestamp(),
+};
     if (projectId) {
       await updateDoc(doc(db, "projects", projectId), payload);
       return;
@@ -2546,24 +2661,47 @@ return (
         </div>
       </div>
 
-      <div style={tabBar}>
-        <TabBtn label="Assets" active={tab === "assets"} onClick={() => setTab(tab === "assets" ? "none" : "assets")} />
-        <TabBtn label="Text" active={tab === "text"} onClick={() => setTab(tab === "text" ? "none" : "text")} />
-        <TabBtn label="Adjust" active={tab === "adjust"} onClick={() => setTab(tab === "adjust" ? "none" : "adjust")} />
-        <TabBtn label="Layers" active={tab === "layers"} onClick={() => setTab(tab === "layers" ? "none" : "layers")} />
-        <TabBtn label="Export" active={tab === "export"} onClick={() => setTab(tab === "export" ? "none" : "export")} />
-      </div>
+{!isDesktop && (
+  <div style={tabBar}>
+    <TabBtn label="Assets" active={tab === "assets"} onClick={() => setTab(tab === "assets" ? "none" : "assets")} />
+    <TabBtn label="Text" active={tab === "text"} onClick={() => setTab(tab === "text" ? "none" : "text")} />
+    <TabBtn label="Adjust" active={tab === "adjust"} onClick={() => setTab(tab === "adjust" ? "none" : "adjust")} />
+    <TabBtn label="Layers" active={tab === "layers"} onClick={() => setTab(tab === "layers" ? "none" : "layers")} />
+    <TabBtn label="Export" active={tab === "export"} onClick={() => setTab(tab === "export" ? "none" : "export")} />
+  </div>
+)}
 
-      {tab !== "none" && (
-        <div style={{ ...sheetWrapBase, height: sheetHeight }}>
-          <div style={sheet}>
-            <div style={sheetHandle} />
-            <div style={sheetHeader}>
-              <div style={{ fontWeight: 900, textTransform: "capitalize" }}>{tab}</div>
-              <button style={iconBtn} onClick={() => setTab("none")} title="Close panel">
-                ✕
-              </button>
-            </div>
+ {tab !== "none" && (
+  <div
+    style={
+      isDesktop
+        ? {
+            position: "fixed",
+            top: 100,
+            left: 270,
+            width: 450,
+            maxHeight: "calc(100vh - 180px)",
+            overflowY: "auto",
+            zIndex: 180,
+            borderRadius: 18,
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(8,10,16,0.96)",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+          }
+        : {
+            ...sheetWrapBase,
+            height: sheetHeight,
+          }
+    }
+  >
+    <div style={sheet}>
+      <div style={sheetHandle} />
+      <div style={sheetHeader}>
+        <div style={{ fontWeight: 900, textTransform: "capitalize" }}>{tab}</div>
+        <button style={iconBtn} onClick={() => setTab("none")} title="Close panel">
+          ×
+        </button>
+      </div>
 
             <div style={sheetBody} className="sheetBody">
 
@@ -3128,7 +3266,146 @@ return (
     </div>
   </div>
 )}
+
 {/* 👇 STEP 3 GOES RIGHT HERE */}
+{isDesktop && (
+  <div
+    style={{
+      position: "fixed",
+      top: 90,
+      left: 12,
+      width: 220,
+      border: "1px solid rgba(255,255,255,0.08)",
+      background: "#111827",
+      padding: 12,
+      borderRadius: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      overflowY: "auto",
+      zIndex: 40,
+    }}
+  >
+{!isDesktop && (
+  <>
+    <div style={tabBar}>
+      <TabBtn
+        label="Assets"
+        active={tab === "assets"}
+        onClick={() => setTab(tab === "assets" ? "none" : "assets")}
+      />
+      <TabBtn
+        label="Text"
+        active={tab === "text"}
+        onClick={() => setTab(tab === "text" ? "none" : "text")}
+      />
+      <TabBtn
+        label="Adjust"
+        active={tab === "adjust"}
+        onClick={() => setTab(tab === "adjust" ? "none" : "adjust")}
+      />
+      <TabBtn
+        label="Layers"
+        active={tab === "layers"}
+        onClick={() => setTab(tab === "layers" ? "none" : "layers")}
+      />
+      <TabBtn
+        label="Export"
+        active={tab === "export"}
+        onClick={() => setTab(tab === "export" ? "none" : "export")}
+      />
+    </div>
+
+    {tab !== "none" && (
+      <div style={{ ...sheetWrapBase, height: sheetHeight }}>
+        <div style={sheet}>
+          <div style={sheetHandle} />
+          <div style={sheetHeader}>
+            <div style={{ fontWeight: 900, textTransform: "capitalize" }}>
+              {tab}
+            </div>
+            <button
+              style={iconBtn}
+              onClick={() => setTab("none")}
+              title="Close panel"
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={sheetBody}>
+            {tab === "assets" && (
+              <>
+                {/* keep your current assets code here */}
+              </>
+            )}
+
+            {tab === "text" && (
+              <>
+                {/* keep your current text code here */}
+              </>
+            )}
+
+            {tab === "adjust" && (
+              <>
+                {/* keep your current adjust code here */}
+              </>
+            )}
+
+            {tab === "layers" && (
+              <>
+                {/* keep your current layers code here */}
+              </>
+            )}
+
+            {tab === "export" && (
+              <>
+                {/* keep your current export code here */}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+  </>
+)}
+  </div>
+)}
+{isDesktop && (
+  <div
+    style={{
+      position: "fixed",
+      top: 90,
+      left: 12,
+      width: 220,
+      border: "1px solid rgba(255,255,255,0.08)",
+      background: "#111827",
+      padding: 12,
+      borderRadius: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      overflowY: "auto",
+      zIndex: 200,
+    }}
+  >
+    <button style={tileBtn} onClick={() => setTab("assets")}>
+      Assets
+    </button>
+    <button style={tileBtn} onClick={() => setTab("text")}>
+      Text
+    </button>
+    <button style={tileBtn} onClick={() => setTab("adjust")}>
+      Adjust
+    </button>
+    <button style={tileBtn} onClick={() => setTab("layers")}>
+      Layers
+    </button>
+    <button style={tileBtn} onClick={() => setTab("export")}>
+      Export
+    </button>
+  </div>
+)}
 {showUploadChoice && (
   <div
     style={{
@@ -3191,9 +3468,7 @@ return (
 
 </div>
 );
- 
 }
-
 function TabBtn({
   label,
   active,
