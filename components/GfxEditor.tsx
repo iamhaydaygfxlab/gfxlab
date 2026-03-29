@@ -1841,7 +1841,16 @@ async function exportVideoFile() {
 
   const finalDataUrl = canvas.toDataURL("image/png");
 setDownloadUrl(finalDataUrl);
-
+await fetch("/api/send-email", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    email: currentUser?.email,
+    image: finalDataUrl,
+  }),
+});
 const a = document.createElement("a");
 a.href = finalDataUrl;
 a.download =

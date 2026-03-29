@@ -2,9 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+} from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { app, db } from "@/lib/firebase";
+import { Capacitor } from "@capacitor/core";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,8 +20,18 @@ export default function LoginPage() {
       const auth = getAuth(app);
       const provider = new GoogleAuthProvider();
 
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+     const isNative = Capacitor.getPlatform() !== "web";
+
+let user;
+
+if (isNative) {
+  await signInWithRedirect(auth, provider);
+  return; // stop here, redirect will handle login
+} else {
+  const result = await signInWithPopup(auth, provider);
+  user = result.user;
+}
+      
 
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
