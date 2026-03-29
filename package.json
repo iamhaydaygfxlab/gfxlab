@@ -29,6 +29,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-konva": "^19.0.3",
+    "resend": "^6.9.4",
     "stripe": "^20.4.0"
   },
   "devDependencies": {

@@ -15,7 +15,21 @@ import {
 } from "react-konva";
 import { getAuth, signOut } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { addDoc, collection, doc, getDoc, increment, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  increment,
+  onSnapshot,
+  serverTimestamp,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+} from "firebase/firestore";
 import { startPurchaseFlow } from "@/lib/startPurchaseFlow";
 import { api } from "@/lib/api";
 import { app, db } from "@/lib/firebase";
@@ -28,6 +42,7 @@ import { type FireTemplate } from "@/lib/templates";
 import MusicClipPicker from "./MusicClipPicker";
 import { Capacitor } from "@capacitor/core";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
+
 
 const FONTS = [
   { name: "Anton", family: "Anton" },
@@ -374,6 +389,8 @@ export default function GfxEditor() {
   const [paid, setPaid] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+const [projectLoaded, setProjectLoaded] = useState(false);
   const [checkoutRestoreReady, setCheckoutRestoreReady] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("Untitled Design");
@@ -405,6 +422,10 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
   const [wmImg, setWmImg] = useState<HTMLImageElement | null>(null);
   const WATERMARK_SRC = "/logo.png";
   const watermarkEnabled = true;
+  const [showUploadChoice, setShowUploadChoice] = useState(false);
+const [pendingFile, setPendingFile] = useState<File | null>(null);
+const [showBgChoice, setShowBgChoice] = useState(false);
+  
 
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [guides, setGuides] = useState<GuideLine[]>([]);
@@ -424,7 +445,8 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
   const historyRef = useRef<Snapshot[]>([]);
   const historyIndexRef = useRef(-1);
   const restoringHistoryRef = useRef(false);
-  
+ const cameraInputRef = useRef<HTMLInputElement | null>(null);
+const libraryInputRef = useRef<HTMLInputElement | null>(null); 
 
   const pinchRef = useRef<
     | {
@@ -585,9 +607,11 @@ useEffect(() => {
     }
 
     setCurrentUser(user ?? null);
+    setAuthChecked(true);
 
     if (!user) {
       setPaid(false);
+      setProjectLoaded(true);
       return;
     }
 
@@ -607,9 +631,93 @@ useEffect(() => {
     unsubAuth();
   };
 }, []);
+useEffect(() => {
+  if (!currentUser) return;
 
+  let cancelled = false;
 
+  async function loadLatestProject() {
+    try {
+      const q = query(
+        collection(db, "projects"),
+        where("ownerUid", "==", currentUser.uid),
+        orderBy("updatedAt", "desc"),
+        limit(1)
+      );
 
+      const snap = await getDocs(q);
+      if (cancelled) return;
+
+      if (snap.empty) {
+        setProjectLoaded(true);
+        return;
+      }
+
+      const latest = snap.docs[0];
+      const data = latest.data();
+
+      setProjectId(latest.id);
+      setProjectName(data?.name || "Untitled Design");
+      setProjectType(data?.projectType || "cover");
+      setPresetId(data?.presetId);
+      setBgSrc(data?.bgSrc || null);
+      setItems(data?.items || []);
+      setSelectedId(null);
+
+      setProjectLoaded(true);
+    } catch (err) {
+      console.error(err);
+      setProjectLoaded(true);
+    }
+  }
+
+  loadLatestProject();
+
+  return () => {
+    cancelled = true;
+  };
+}, [currentUser]);
+
+useEffect(() => {
+  if (!currentUser) return;
+  if (!projectLoaded) return;
+
+  const timeout = setTimeout(() => {
+    saveProject();
+  }, 1200);
+
+  return () => clearTimeout(timeout);
+}, [projectName, projectType, presetId, bgSrc, items]);
+// ✅ LOGIN GATE (PUT EXACTLY HERE)
+
+if (!authChecked || !projectLoaded) {
+  return <div style={{ padding: 40, color: "#fff" }}>Loading...</div>;
+}
+
+if (!currentUser) {
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#0b0b0b",
+        color: "#fff",
+      }}
+    >
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>
+          Sign in required
+        </div>
+
+        <button onClick={() => (window.location.href = "/login")}>
+          Log In
+        </button>
+      </div>
+    </div>
+  );
+}
   useEffect(() => {
     const currentPresetStillValid = presets.some((p) => p.id === presetId);
     if (!currentPresetStillValid) setPresetId(presets[0].id);
@@ -1238,42 +1346,42 @@ async function pickMusicFromDevice() {
       window.location.href = "/login";
     }
   }
+async function saveProject() {
+  try {
+    const auth = getAuth(app);
+    const user = auth.currentUser;
 
-  async function saveProject() {
-    try {
-      const auth = getAuth(app);
-      const user = auth.currentUser;
+    if (!user) return;
 
-      if (!user) {
-        alert("You must be signed in to save designs.");
-        return;
-      }
+    setSaving(true);
 
-      setSaving(true);
+    const payload = {
+      ownerUid: user.uid,
+      name: projectName,
+      projectType,
+      presetId,
+      bgSrc,
+      items,
+      updatedAt: serverTimestamp(),
+    };
 
-      const payload = {
-        ownerUid: user.uid,
-        name: projectName,
-        projectType,
-        presetId,
-        bgSrc,
-        items,
-        updatedAt: serverTimestamp(),
-      };
-
-      const created = await addDoc(collection(db, "projects"), {
-        ...payload,
-        createdAt: serverTimestamp(),
-      });
-
-      setProjectId(created.id);
-    } catch (err: any) {
-      console.error("Save project failed:", err);
-      alert(err?.message || "Could not save project.");
-    } finally {
-      setSaving(false);
+    if (projectId) {
+      await updateDoc(doc(db, "projects", projectId), payload);
+      return;
     }
+
+    const created = await addDoc(collection(db, "projects"), {
+      ...payload,
+      createdAt: serverTimestamp(),
+    });
+
+    setProjectId(created.id);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setSaving(false);
   }
+}
 
 async function makeAiBackground() {
   const idea = window.prompt("Describe your background");
@@ -1847,6 +1955,140 @@ async function handleMusicExport() {
     alert("Could not upload music file.");
   }
 }
+async function addImageToCanvas(file: File) {
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    const src = reader.result as string;
+
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      const maxWidth = preset.w * 0.7;
+      const maxHeight = preset.h * 0.7;
+
+      let width = img.width;
+      let height = img.height;
+
+      const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+      width = width * scale;
+      height = height * scale;
+
+     const newItem: ImageItem = {
+  id: uid(),
+  kind: "image",
+  x: Math.round((preset.w - width) / 2),
+  y: Math.round((preset.h - height) / 2),
+  rotation: 0,
+  src,
+  width,
+  height,
+  scale: 1,
+  adj: defaultAdj(),
+};
+
+      setItems((prev: Item[]) => [...prev, newItem]);
+      setSelectedId(newItem.id);
+    };
+
+    img.src = src;
+  };
+
+  reader.readAsDataURL(file);
+}
+
+async function handleCutoutFile(file: File) {
+  try {
+    setCutoutLoading(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/cutout", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data?.error || "Background removal failed");
+
+    const src = data?.image || data?.url || data?.dataUrl;
+    if (!src) throw new Error("No cutout image returned");
+
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      const maxWidth = preset.w * 0.7;
+      const maxHeight = preset.h * 0.7;
+
+      let width = img.width;
+      let height = img.height;
+
+      const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+      width = width * scale;
+      height = height * scale;
+
+   const newItem: ImageItem = {
+  id: uid(),
+  kind: "image",
+  x: Math.round((preset.w - width) / 2),
+  y: Math.round((preset.h - height) / 2),
+  rotation: 0,
+  src,
+  width,
+  height,
+  scale: 1,
+  adj: defaultAdj(),
+};
+
+      setItems((prev: Item[]) => [...prev, newItem]);
+      setSelectedId(newItem.id);
+    };
+
+    img.src = src;
+  } catch (e: any) {
+    alert(e?.message || "Background removal failed");
+  } finally {
+    setCutoutLoading(false);
+  }
+}
+
+async function handleImageUpload(file: File) {
+  try {
+    if (!file) return;
+
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
+const [showBgChoice, setShowBgChoice] = useState(false);
+
+  } catch (e: any) {
+    alert(e?.message || "Image upload failed");
+  }
+}
+
+async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  setPendingFile(file);
+  setShowBgChoice(true);
+
+  e.target.value = "";
+}
+
+function handleUploadButtonClick() {
+  const useCamera = window.confirm(
+    "Press OK to take a photo.\nPress Cancel to choose from your library."
+  );
+
+  if (useCamera) {
+    cameraInputRef.current?.click();
+  } else {
+    libraryInputRef.current?.click();
+  }
+}
 function loadTemplate(template: FireTemplate) {
     setProjectType(template.type);
     setPresetId(template.presetId);
@@ -2148,6 +2390,22 @@ return (
 
       <div style={canvasArea}>
         <div ref={canvasHostRef} style={canvasWrap}>
+  <input
+  ref={cameraInputRef}
+  type="file"
+  accept="image/*"
+  capture="environment"
+  style={{ display: "none" }}
+  onChange={handleFileChange}
+/>
+
+<input
+  ref={libraryInputRef}
+  type="file"
+  accept="image/*"
+  style={{ display: "none" }}
+  onChange={handleFileChange}
+/>
           <Stage
             ref={stageRef as any}
             width={hostSize.w}
@@ -2326,6 +2584,8 @@ return (
             </div>
 
             <div style={sheetBody} className="sheetBody">
+
+              
               {tab === "assets" && (
                 <div>
                   <div style={{ padding: 12, paddingBottom: 0 }}>
@@ -2346,61 +2606,54 @@ return (
 
              
             
+<div style={{ display: "grid", gap: 14, padding: 12 }}>
+  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.75 }}>
+    ADD IMAGE
+  </div>
 
-                  <div style={assetsGrid}>
-                    <label style={tileBtn}>
-                      Upload Image
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) addImageFromFile(f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
+  <label
+    style={{ ...tileBtn, padding: "10px 12px" }}
+    onClick={() => setShowUploadChoice(true)}
+  >
+    Upload Image
+  </label>
 
-                    <label style={tileBtn}>
-                      Upload Your Own Background
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) setBackgroundFromFile(f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
+  <div
+    style={{
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: 1,
+      opacity: 0.75,
+      marginTop: 2,
+    }}
+  >
+    BACKGROUND
+  </div>
 
-                <button
-  onClick={makeAiBackground}
-  disabled={creatingAIBackground}
-  style={tileBtn}
->
-  {creatingAIBackground
-    ? "✨ Generating Scene......"
-    : "Create AI Background"}
-</button>
+  <label style={{ ...tileBtn, padding: "10px 12px" }}>
+    Upload Your Own Background
+    <input
+      type="file"
+      accept="image/*"
+      style={{ display: "none" }}
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) setBackgroundFromFile(f);
+        e.currentTarget.value = "";
+      }}
+    />
+  </label>
 
-                    <label style={tileBtn}>
-                      {cutoutLoading ? "Cutting out..." : "Remove Background From Photo"}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        disabled={cutoutLoading}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) cutoutFromFileFreeAI(f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
-                  </div>
+  <button
+    onClick={makeAiBackground}
+    disabled={creatingAIBackground}
+    style={{ ...tileBtn, padding: "10px 12px" }}
+  >
+    {creatingAIBackground
+      ? "✨ Generating Scene......"
+      : "Create AI Background"}
+  </button>
+</div>
 
             
 
@@ -2828,8 +3081,135 @@ return (
           </div>
         </div>
       )}
+      {/* your entire UI above this */}
+{showBgChoice && pendingFile && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0,0,0,0.7)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 9999,
+    }}
+  >
+    <div
+      style={{
+        background: "#111",
+        padding: 20,
+        borderRadius: 12,
+        display: "grid",
+        gap: 12,
+        width: 260,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontWeight: 800, color: "#fff" }}>
+        Remove Background?
+      </div>
+
+    <button
+  style={tileBtn}
+  disabled={cutoutLoading}
+  onClick={async () => {
+    setCutoutLoading(true);
+
+    try {
+      await cutoutFromFileFreeAI(pendingFile);
+      setPendingFile(null);
+      setShowBgChoice(false); // 👈 moved here
+    } catch (e) {
+      console.error(e);
+      alert("Background removal failed");
+    } finally {
+      setCutoutLoading(false);
+    }
+  }}
+>
+  {cutoutLoading ? "Removing background..." : "Yes"}
+</button>
+
+      <button
+        style={tileBtn}
+        onClick={async () => {
+          setShowBgChoice(false);
+          await addImageToCanvas(pendingFile);
+          setPendingFile(null);
+        }}
+      >
+        No
+      </button>
     </div>
-  );
+  </div>
+)}
+{/* 👇 STEP 3 GOES RIGHT HERE */}
+{showUploadChoice && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0,0,0,0.7)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 9999,
+    }}
+  >
+    <div
+      style={{
+        background: "#111",
+        padding: 20,
+        borderRadius: 12,
+        display: "grid",
+        gap: 12,
+        width: 260,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontWeight: 800, color: "#fff" }}>
+        Choose Option
+      </div>
+
+      <button
+        style={tileBtn}
+        onClick={() => {
+          setShowUploadChoice(false);
+          cameraInputRef.current?.click();
+        }}
+      >
+        📷 Take Photo
+      </button>
+
+      <button
+        style={tileBtn}
+        onClick={() => {
+          setShowUploadChoice(false);
+          libraryInputRef.current?.click();
+        }}
+      >
+        🖼️ Choose from Library
+      </button>
+
+      <button
+        style={{ ...tileBtn, background: "#333" }}
+        onClick={() => setShowUploadChoice(false)}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
+
+</div>
+);
+ 
 }
 
 function TabBtn({

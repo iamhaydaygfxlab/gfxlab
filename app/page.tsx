@@ -7,7 +7,23 @@ import { Capacitor } from "@capacitor/core";
 export default function HomePage() {
   const router = useRouter();
   const isNative = Capacitor.getPlatform() !== "web";
-
+const tileBtn = {
+  width: "100px",
+  height: "25px",
+  borderRadius: "14px",
+  border: "1px solid rgb(255, 255, 255)",
+  background:
+    "linear-gradient(90deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.9) 45%, rgba(0,0,0,0.95) 100%)",
+  color: "#ffffff",
+  fontWeight: 700,
+  fontSize: "16px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textDecoration: "none",
+  backdropFilter: "blur(4px)",
+  cursor: "pointer",
+} as const;
   return (
     <>
       <style jsx>{`
@@ -145,9 +161,22 @@ export default function HomePage() {
       backdropFilter: "blur(4px)",
     }}
   >
-    CUSTOM FROM 
+    CUSTOM FORM  
   </Link>
 )}
+<button
+  style={tileBtn}
+  onClick={() => (window.location.href = "/login")}
+>
+  Log In
+</button>
+
+<button
+  style={tileBtn}
+  onClick={() => (window.location.href = "/signup")}
+>
+  Sign Up
+</button>
         </div>
       </main>
     </>
