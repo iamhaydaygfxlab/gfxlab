@@ -23,16 +23,24 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const uid = url.searchParams.get("uid");
     const guestId = url.searchParams.get("guestId");
+    const email = url.searchParams.get("email");
+    const exportId = url.searchParams.get("exportId");
 
     const form = new URLSearchParams();
     form.append("mode", "payment");
     form.append("line_items[0][price]", priceId);
     form.append("line_items[0][quantity]", "1");
-form.append("success_url", `${appUrl}/export-success?session_id={CHECKOUT_SESSION_ID}`);
+    form.append("success_url", `${appUrl}/export-success?session_id={CHECKOUT_SESSION_ID}`);
     form.append("cancel_url", `${appUrl}/editor?export=cancel`);
+
+    if (email) {
+      form.append("customer_email", email);
+    }
 
     if (uid) form.append("metadata[uid]", uid);
     if (guestId) form.append("metadata[guestId]", guestId);
+    if (exportId) form.append("metadata[exportId]", exportId);
+    if (email) form.append("metadata[email]", email);
 
     const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
@@ -53,9 +61,10 @@ form.append("success_url", `${appUrl}/export-success?session_id={CHECKOUT_SESSIO
     const session = JSON.parse(text);
 
     if (!session.url) {
-      return new NextResponse("Checkout-export failed: Stripe did not return a checkout URL", {
-        status: 500,
-      });
+      return new NextResponse(
+        "Checkout-export failed: Stripe did not return a checkout URL",
+        { status: 500 }
+      );
     }
 
     return NextResponse.redirect(session.url);

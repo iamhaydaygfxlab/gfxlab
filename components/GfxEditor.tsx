@@ -1962,6 +1962,86 @@ document.body.removeChild(a);
       setTimeout(() => setExporting(false), 80);
     }
   }
+async function createPendingExportForEmail(imageBlob: Blob, email: string) {
+  const storage = getStorage(app);
+
+  const filePath = `pending-exports/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}.png`;
+
+  const storageRef = ref(storage, filePath);
+
+  await uploadBytes(storageRef, imageBlob, {
+    contentType: "image/png",
+  });
+
+  const imageUrl = await getDownloadURL(storageRef);
+
+const docRef = await addDoc(collection(db, "pendingExports"), {
+  email,
+  imageUrl,
+  projectName,
+  projectType,
+  presetId,
+  exportKind: "image", // 👈 ADD THIS
+  paid: false,
+  emailed: false,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
+
+  return { exportId: docRef.id, imageUrl };
+}
+async function createPendingMusicExportForEmail(args: {
+  imageBlob: Blob;
+  musicFile: File;
+  email: string;
+  clipStart: number;
+  clipDuration: number;
+}) {
+  const storage = getStorage(app);
+
+  const imagePath = `pending-exports/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}.png`;
+
+  const imageRef = ref(storage, imagePath);
+
+  await uploadBytes(imageRef, args.imageBlob, {
+    contentType: "image/png",
+  });
+
+  const imageUrl = await getDownloadURL(imageRef);
+
+  const musicPath = `pending-music/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}-${args.musicFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+
+  const musicRef = ref(storage, musicPath);
+
+  await uploadBytes(musicRef, args.musicFile, {
+    contentType: args.musicFile.type || "audio/mpeg",
+  });
+
+  const audioUrl = await getDownloadURL(musicRef);
+const docRef = await addDoc(collection(db, "pendingExports"), {
+  email: args.email,
+  imageUrl,
+  audioUrl,
+  clipStart,
+  clipDuration,
+  projectName,
+  projectType,
+  presetId,
+  exportKind: "music", // 👈 ADD THIS
+  paid: false,
+  emailed: false,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
+
+  return { exportId: docRef.id, imageUrl, audioUrl };
+}
 
 async function handleExport() {
   const platform = Capacitor.getPlatform();
@@ -1980,8 +2060,6 @@ async function handleExport() {
     return;
   }
 
-  // 👉 Web flow continues here
-
   const uid =
     currentUser?.uid ||
     (typeof window !== "undefined"
@@ -1992,8 +2070,40 @@ async function handleExport() {
     localStorage.setItem("gfxlab_guest_id", uid);
   }
 
-  await saveCurrentDesignForCheckout();
-  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}`;
+  const email = currentUser?.email || "";
+
+  if (!email) {
+    alert("User email not found. Please log in before exporting.");
+    return;
+  }
+
+  try {
+    const imageBlob = await exportCanvasBlob();
+    if (!imageBlob) {
+      alert("Could not prepare export image.");
+      return;
+    }
+
+    const { exportId } = await createPendingExportForEmail(imageBlob, email);
+
+    await saveCurrentDesignForCheckout();
+
+    const params = new URLSearchParams();
+
+    if (currentUser?.uid) {
+      params.set("uid", currentUser.uid);
+    } else if (uid) {
+      params.set("guestId", uid);
+    }
+
+    params.set("email", email);
+    params.set("exportId", exportId);
+
+    window.location.href = `/api/stripe/checkout-export?${params.toString()}`;
+  } catch (err: any) {
+    console.error(err);
+    alert(err?.message || "Could not start export checkout.");
+  }
 }
 
 async function handleMusicExport() {
@@ -2025,31 +2135,49 @@ async function handleMusicExport() {
     localStorage.setItem("gfxlab_guest_id", uid);
   }
 
-  const file: File = musicFile;
+  const email = currentUser?.email || "";
+
+  if (!email) {
+    alert("User email not found. Please log in before exporting.");
+    return;
+  }
 
   try {
-    const uploadedUrl = await uploadMusicToFirebase(file);
-    setUploadedAudioUrl(uploadedUrl);
+    const imageBlob = await exportCanvasBlob();
+    if (!imageBlob) {
+      alert("Could not prepare export image.");
+      return;
+    }
 
-    await saveCurrentDesignForCheckout();
+    const file: File = musicFile;
 
-    await savePendingMusicExport({
-      audioBlob: file,
-      fileName: file.name,
-      fileType: file.type || "audio/mpeg",
+    const { exportId, audioUrl } = await createPendingMusicExportForEmail({
+      imageBlob,
+      musicFile: file,
+      email,
       clipStart,
       clipDuration,
     });
 
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("pending_music_export", "true");
-      sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
+    setUploadedAudioUrl(audioUrl);
+
+    await saveCurrentDesignForCheckout();
+
+    const params = new URLSearchParams();
+
+    if (currentUser?.uid) {
+      params.set("uid", currentUser.uid);
+    } else if (uid) {
+      params.set("guestId", uid);
     }
 
-    window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(uid)}`;
-  } catch (err) {
+    params.set("email", email);
+    params.set("exportId", exportId);
+
+    window.location.href = `/api/stripe/checkout-video-export?${params.toString()}`;
+  } catch (err: any) {
     console.error(err);
-    alert("Could not upload music file.");
+    alert(err?.message || "Could not start music export checkout.");
   }
 }
 async function addImageToCanvas(file: File) {
@@ -2486,7 +2614,15 @@ return (
       </div>
 
       <div style={canvasArea}>
-        <div ref={canvasHostRef} style={canvasWrap}>
+       <div
+  ref={canvasHostRef}
+  style={{
+    ...canvasWrap,
+    minHeight: "100dvh",
+    paddingTop: "env(safe-area-inset-top)",
+    paddingBottom: "env(safe-area-inset-bottom)",
+  }}
+>
   <input
   ref={cameraInputRef}
   type="file"
@@ -2680,7 +2816,7 @@ return (
             top: 100,
             left: 270,
             width: 450,
-            maxHeight: "calc(100vh - 180px)",
+            maxHeight: "calc(100dvh - 180px)",
             overflowY: "auto",
             zIndex: 180,
             borderRadius: 18,

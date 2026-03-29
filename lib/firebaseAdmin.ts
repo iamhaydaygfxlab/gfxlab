@@ -1,21 +1,19 @@
-import admin from "firebase-admin";
+import { getApps, initializeApp, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
-function getPrivateKey() {
-  const k = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
-  if (!k) return undefined;
-  // fixes newline issues in env vars
-  return k.replace(/\\n/g, "\n");
-}
+const firebaseAdminConfig = {
+  projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+};
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey: getPrivateKey(),
-    }),
+const adminApp =
+  getApps()[0] ||
+  initializeApp({
+    credential: cert(firebaseAdminConfig),
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });
-}
 
-export const adminDb = admin.firestore();
-export { admin };
+export const adminDb = getFirestore(adminApp);
+export const adminStorage = getStorage(adminApp);
