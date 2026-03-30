@@ -2039,51 +2039,27 @@ const docRef = await addDoc(collection(db, "pendingExports"), {
 }
 
 async function handleExport() {
-  const platform = Capacitor.getPlatform();
-  console.log("platform:", platform);
-
-  const isNativeMobile =
-    platform === "android" || platform === "ios";
-
-  if (isNativeMobile) {
-    try {
-      await startPurchaseFlow("export_image");
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Purchase failed.");
-    }
-    return;
-  }
-
-  if (!currentUser?.uid || !currentUser?.email) {
-    alert("Please log in before exporting.");
-    window.location.href = "/login";
-    return;
-  }
-
-  const uid = currentUser.uid;
-  const email = currentUser.email;
-
   try {
-    const imageBlob = await exportCanvasBlob();
-    if (!imageBlob) {
-      alert("Could not prepare export image.");
+    const platform = Capacitor.getPlatform();
+    console.log("platform:", platform);
+
+    if (!currentUser?.uid || !currentUser?.email) {
+      alert("Please log in before exporting.");
+      window.location.href = "/login";
       return;
     }
-
-    const { exportId } = await createPendingExportForEmail(imageBlob, email);
 
     await saveCurrentDesignForCheckout();
 
     const params = new URLSearchParams();
-    params.set("uid", uid);
-    params.set("email", email);
-    params.set("exportId", exportId);
+    params.set("uid", currentUser.uid);
+    params.set("email", currentUser.email);
 
-    window.location.href = `/api/stripe/checkout-export?${params.toString()}`;
+    // both web and app go to checkout first
+    window.location.href = api(`/api/stripe/checkout-export?${params.toString()}`);
   } catch (err: any) {
     console.error(err);
-    alert(err?.message || "Could not start export checkout.");
+    alert(err?.message || "Could not start export.");
   }
 }
 async function handleMusicExport() {
