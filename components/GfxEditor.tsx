@@ -150,7 +150,7 @@ function nodeIsGone(node: Konva.Node | null | undefined) {
 export function loadHtmlImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+  
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Image failed to load: " + src));
     img.decoding = "async";
@@ -2153,7 +2153,7 @@ async function addImageToCanvas(file: File) {
     const src = reader.result as string;
 
     const img = new window.Image();
-    img.crossOrigin = "anonymous";
+  
 
     img.onload = () => {
       const maxWidth = preset.w * 0.7;
@@ -2209,7 +2209,7 @@ async function handleCutoutFile(file: File) {
     if (!src) throw new Error("No cutout image returned");
 
     const img = new window.Image();
-    img.crossOrigin = "anonymous";
+   
 
     img.onload = () => {
       const maxWidth = preset.w * 0.7;

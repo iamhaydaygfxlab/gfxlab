@@ -1,39 +1,42 @@
-import { NextRequest, NextResponse } from "next/server";
+// app/api/image-proxy/route.ts
+import { NextRequest } from "next/server";
+
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const url = req.nextUrl.searchParams.get("url");
+
+  if (!url) {
+    return new Response("Missing url", { status: 400 });
+  }
+
   try {
-    const { searchParams } = new URL(req.url);
-    const rawUrl = searchParams.get("url");
-
-    if (!rawUrl) {
-      return new NextResponse("Missing url", { status: 400 });
-    }
-
-    const imageUrl = rawUrl;
-
-    const res = await fetch(imageUrl, {
-      headers: {
-        Accept: "image/*",
-      },
+    const upstream = await fetch(url, {
+      cache: "no-store",
     });
 
-    if (!res.ok) {
-      return new NextResponse("Upstream image fetch failed", { status: res.status });
+    if (!upstream.ok) {
+      return new Response(`Upstream fetch failed: ${upstream.status}`, {
+        status: 400,
+      });
     }
 
-    const contentType = res.headers.get("content-type") || "image/png";
-    const arrayBuffer = await res.arrayBuffer();
+    const contentType =
+      upstream.headers.get("content-type") || "application/octet-stream";
 
-    return new NextResponse(arrayBuffer, {
+    const data = await upstream.arrayBuffer();
+
+    return new Response(data, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=86400",
+        "Access-Control-Allow-Origin": "*",
       },
     });
-  } catch (err) {
-    console.error("image-proxy failed:", err);
-    return new NextResponse("Proxy failed", { status: 500 });
+  } catch (err: any) {
+    return new Response(`Proxy failed: ${err?.message || "unknown error"}`, {
+      status: 500,
+    });
   }
 }
