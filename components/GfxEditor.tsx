@@ -2055,22 +2055,14 @@ async function handleExport() {
     return;
   }
 
-  const uid =
-    currentUser?.uid ||
-    (typeof window !== "undefined"
-      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-      : "");
-
-  if (typeof window !== "undefined" && uid) {
-    localStorage.setItem("gfxlab_guest_id", uid);
-  }
-
-  const email = currentUser?.email || "";
-
-  if (!email) {
-    alert("User email not found. Please log in before exporting.");
+  if (!currentUser?.uid || !currentUser?.email) {
+    alert("Please log in before exporting.");
+    window.location.href = "/login";
     return;
   }
+
+  const uid = currentUser.uid;
+  const email = currentUser.email;
 
   try {
     const imageBlob = await exportCanvasBlob();
@@ -2084,13 +2076,7 @@ async function handleExport() {
     await saveCurrentDesignForCheckout();
 
     const params = new URLSearchParams();
-
-    if (currentUser?.uid) {
-      params.set("uid", currentUser.uid);
-    } else if (uid) {
-      params.set("guestId", uid);
-    }
-
+    params.set("uid", uid);
     params.set("email", email);
     params.set("exportId", exportId);
 
@@ -2100,7 +2086,6 @@ async function handleExport() {
     alert(err?.message || "Could not start export checkout.");
   }
 }
-
 async function handleMusicExport() {
   if (!musicFile) {
     alert("Upload music first.");
@@ -2120,22 +2105,14 @@ async function handleMusicExport() {
     return;
   }
 
-  const uid =
-    currentUser?.uid ||
-    (typeof window !== "undefined"
-      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
-      : "");
-
-  if (typeof window !== "undefined" && uid) {
-    localStorage.setItem("gfxlab_guest_id", uid);
-  }
-
-  const email = currentUser?.email || "";
-
-  if (!email) {
-    alert("User email not found. Please log in before exporting.");
+  if (!currentUser?.uid || !currentUser?.email) {
+    alert("Please log in before exporting.");
+    window.location.href = "/login";
     return;
   }
+
+  const uid = currentUser.uid;
+  const email = currentUser.email;
 
   try {
     const imageBlob = await exportCanvasBlob();
@@ -2159,13 +2136,7 @@ async function handleMusicExport() {
     await saveCurrentDesignForCheckout();
 
     const params = new URLSearchParams();
-
-    if (currentUser?.uid) {
-      params.set("uid", currentUser.uid);
-    } else if (uid) {
-      params.set("guestId", uid);
-    }
-
+    params.set("uid", uid);
     params.set("email", email);
     params.set("exportId", exportId);
 
