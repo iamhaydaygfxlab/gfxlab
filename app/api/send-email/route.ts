@@ -25,33 +25,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing email address" }, { status: 400 });
     }
 
-    if (!imageUrl) {
-      return NextResponse.json({ error: "Missing imageUrl" }, { status: 400 });
-    }
+    let attachments: any[] = [];
 
-    const imgRes = await fetch(imageUrl);
-    if (!imgRes.ok) {
-      throw new Error(`Could not fetch image: ${imgRes.status}`);
-    }
+    // 🔥 TRY to fetch image (but don't fail if it breaks)
+    try {
+      if (imageUrl) {
+        const imgRes = await fetch(imageUrl);
+        if (imgRes.ok) {
+          const buffer = await imgRes.arrayBuffer();
+          const base64 = Buffer.from(buffer).toString("base64");
 
-    const contentType = imgRes.headers.get("content-type") || "image/png";
-    const arrayBuffer = await imgRes.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
+          attachments.push({
+            filename: `${projectName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.png`,
+            content: base64,
+          });
+        } else {
+          console.log("Image fetch failed:", imgRes.status);
+        }
+      }
+    } catch (err) {
+      console.log("Image fetch error:", err);
+    }
 
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 24px;">
         <h2>Your design is ready</h2>
-        <p>Thanks for your purchase.</p>
         <p><strong>${projectName}</strong></p>
-        <p>Your image is attached to this email.</p>
         <p>
-          <a href="${imageUrl}" target="_blank" rel="noopener noreferrer">
+          <a href="${imageUrl}" target="_blank">
             Download your image
           </a>
         </p>
-        <div style="margin-top: 20px;">
-          <img src="${imageUrl}" alt="${projectName}" style="max-width: 100%; border-radius: 12px;" />
-        </div>
+        ${
+          imageUrl
+            ? `<img src="${imageUrl}" style="max-width:100%; border-radius:12px;" />`
+            : ""
+        }
       </div>
     `;
 
@@ -60,12 +69,7 @@ export async function POST(req: Request) {
       to,
       subject: `${projectName} - Your export is ready`,
       html,
-      attachments: [
-        {
-          filename: `${projectName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.png`,
-          content: base64,
-        },
-      ],
+      attachments,
     });
 
     return NextResponse.json({ ok: true, result });
