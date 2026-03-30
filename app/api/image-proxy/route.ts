@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Missing url", { status: 400 });
     }
 
-    const imageUrl = decodeURIComponent(rawUrl);
+    const imageUrl = rawUrl;
 
     const res = await fetch(imageUrl, {
       headers: {
