@@ -32,7 +32,7 @@ import {
 } from "firebase/firestore";
 import { startPurchaseFlow } from "@/lib/startPurchaseFlow";
 import { api } from "@/lib/api";
-import { app, db } from "@/lib/firebase";
+import { app, db, storage } from "@/lib/firebase";
 import { cutoutPersonToPngDataUrl } from "@/lib/cutout";
 import AssetLibrary, { type AssetItem } from "./AssetLibrary";
 import FontPanel from "./FontPanel";
@@ -150,7 +150,7 @@ function nodeIsGone(node: Konva.Node | null | undefined) {
 export function loadHtmlImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-  
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Image failed to load: " + src));
     img.decoding = "async";
@@ -382,80 +382,27 @@ async function loadPendingMusicExport(): Promise<{
 async function deletePendingMusicExport() {
   await deletePendingDesign("gfxlab_pending_music_export");
 }
-async function trimTransparentImage(src: string): Promise<{
-  src: string;
-  width: number;
-  height: number;
-}> {
-  const img = await loadHtmlImage(src);
+function dataUrlToBlob(dataUrl: string): Blob {
+  const parts = dataUrl.split(",");
+  const byteString = atob(parts[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = img.width;
-  canvas.height = img.height;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return { src, width: img.width, height: img.height };
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
   }
 
-  ctx.drawImage(img, 0, 0);
+  return new Blob([ab], { type: "image/png" });
+}
 
-  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  let top = height;
-  let left = width;
-  let right = 0;
-  let bottom = 0;
-  let found = false;
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const alpha = data[(y * width + x) * 4 + 3];
-      if (alpha > 8) {
-        found = true;
-        if (x < left) left = x;
-        if (x > right) right = x;
-        if (y < top) top = y;
-        if (y > bottom) bottom = y;
-      }
-    }
-  }
-
-  if (!found) {
-    return { src, width: img.width, height: img.height };
-  }
-
-  const trimW = right - left + 1;
-  const trimH = bottom - top + 1;
-
-  const trimmedCanvas = document.createElement("canvas");
-  trimmedCanvas.width = trimW;
-  trimmedCanvas.height = trimH;
-
-  const trimmedCtx = trimmedCanvas.getContext("2d");
-  if (!trimmedCtx) {
-    return { src, width: img.width, height: img.height };
-  }
-
-  trimmedCtx.drawImage(
-    canvas,
-    left,
-    top,
-    trimW,
-    trimH,
-    0,
-    0,
-    trimW,
-    trimH
-  );
-
-  return {
-    src: trimmedCanvas.toDataURL("image/png"),
-    width: trimW,
-    height: trimH,
-  };
+async function uploadToFirebase(dataUrl: string) {
+  const blob = dataUrlToBlob(dataUrl);
+  const fileRef = ref(storage, `exports/${Date.now()}.png`);
+  await uploadBytes(fileRef, blob);
+  return await getDownloadURL(fileRef);
 }
 "CONST"
+
 export default function GfxEditor() {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
@@ -499,8 +446,6 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
   const [showUploadChoice, setShowUploadChoice] = useState(false);
 const [pendingFile, setPendingFile] = useState<File | null>(null);
 const [showBgChoice, setShowBgChoice] = useState(false);
-const [strokeColor, setStrokeColor] = useState("#000000");
-const [shadowColor, setShadowColor] = useState("#000000");
   
 
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -579,7 +524,7 @@ const artboardPadding = isMobile ? 14 : 28;
     const scaledRatio = Math.max(0.02, ratio);
     const w = Math.max(120, Math.round(preset.w * scaledRatio));
     const h = Math.max(120, Math.round(preset.h * scaledRatio));
-  const x = Math.round((hostSize.w - w) / 2) + (isDesktop ? 310 : 0);
+    const x = Math.round((hostSize.w - w) / 2);
     const y = workspacePadding + 10;
     return { w, h, ratio: scaledRatio, x, y };
   }, [hostSize, panelReserve, preset, workspacePadding, artboardPadding]);
@@ -1014,12 +959,17 @@ useEffect(() => {
 
     return () => window.clearTimeout(t);
   }, [checkoutRestoreReady, bgImg, presetId, projectType, musicFile, clipStart, clipDuration]);
+
 function toSafeSrc(src: string) {
   if (
     src.startsWith("data:") ||
     src.startsWith("blob:") ||
     src.startsWith("/")
   ) {
+    return src;
+  }
+
+  if (src.includes("firebasestorage.googleapis.com")) {
     return src;
   }
 
@@ -1138,8 +1088,7 @@ async function pickMusicFromDevice() {
   async function addAssetToCanvas(asset: AssetItem) {
     try {
       const safeSrc = toSafeSrc(asset.src);
-      const trimmed = await trimTransparentImage(safeSrc);
-const img = await loadHtmlImage(trimmed.src);
+      const img = await loadHtmlImage(safeSrc);
       const isBackground = asset.type === "background";
 
       if (isBackground) {
@@ -1150,9 +1099,9 @@ const img = await loadHtmlImage(trimmed.src);
 
       const targetMaxW = Math.round(preset.w * 0.85);
       const targetMaxH = Math.round(preset.h * 0.85);
-    const ratio = Math.min(targetMaxW / trimmed.width, targetMaxH / trimmed.height, 1);
-const w = Math.max(60, Math.round(trimmed.width * ratio));
-const h = Math.max(60, Math.round(trimmed.height * ratio));
+      const ratio = Math.min(targetMaxW / img.width, targetMaxH / img.height, 1);
+      const w = Math.max(60, Math.round(img.width * ratio));
+      const h = Math.max(60, Math.round(img.height * ratio));
 
       const imgItem: ImageItem = {
         id: uid(),
@@ -1160,7 +1109,7 @@ const h = Math.max(60, Math.round(trimmed.height * ratio));
         x: Math.round((preset.w - w) / 2),
         y: Math.round((preset.h - h) / 2),
         rotation: 0,
-        src: trimmed.src,
+        src: safeSrc,
         width: w,
         height: h,
         scale: 1,
@@ -1181,9 +1130,7 @@ const h = Math.max(60, Math.round(trimmed.height * ratio));
 
     reader.onload = async () => {
       try {
-        const originalSrc = String(reader.result);
-const trimmed = await trimTransparentImage(originalSrc);
-const src = trimmed.src;
+        const src = String(reader.result);
         const img = await loadHtmlImage(src);
         const targetMaxW = Math.round(preset.w * 0.7);
         const targetMaxH = Math.round(preset.h * 0.7);
@@ -1403,33 +1350,6 @@ const src = trimmed.src;
       window.location.href = "/login";
     }
   }
-function cleanForFirestore(value: any): any {
-  if (value === undefined) return null;
-
-  if (value === null) return null;
-
-  if (Array.isArray(value)) {
-    return value.map((item) => cleanForFirestore(item));
-  }
-
-  if (typeof value === "object") {
-    const out: Record<string, any> = {};
-
-    for (const [key, val] of Object.entries(value)) {
-      if (typeof val === "function") continue;
-      if (val instanceof File) continue;
-      if (val instanceof Blob) continue;
-      if (typeof Image !== "undefined" && val instanceof Image) continue;
-
-      out[key] = cleanForFirestore(val);
-    }
-
-    return out;
-  }
-
-  return value;
-}
-
 async function saveProject() {
   try {
     const auth = getAuth(app);
@@ -1440,14 +1360,15 @@ async function saveProject() {
     setSaving(true);
 
     const payload = {
-  ownerUid: user.uid,
-  name: projectName,
-  projectType,
-  presetId,
-  bgSrc: bgSrc ?? null,
-  items: cleanForFirestore(items),
-  updatedAt: serverTimestamp(),
-};
+      ownerUid: user.uid,
+      name: projectName,
+      projectType,
+      presetId,
+      bgSrc,
+      items,
+      updatedAt: serverTimestamp(),
+    };
+
     if (projectId) {
       await updateDoc(doc(db, "projects", projectId), payload);
       return;
@@ -1922,18 +1843,27 @@ async function exportVideoFile() {
       ctx.clearRect(0, 0, preset.w, preset.h);
       ctx.drawImage(img, 0, 0, preset.w, preset.h);
 
-  const finalDataUrl = canvas.toDataURL("image/png");
-setDownloadUrl(finalDataUrl);
+const finalDataUrl = canvas.toDataURL("image/png");
+
+const publicUrl = await uploadToFirebase(finalDataUrl);
+
 await fetch("/api/send-email", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    email: currentUser?.email,
-    image: finalDataUrl,
+    to: currentUser?.email,
+    projectName:
+      projectType === "cover"
+        ? "gfxlab-cover"
+        : projectType === "flyer"
+        ? "gfxlab-flyer"
+        : "gfxlab-social",
+    imageUrl: publicUrl,
   }),
 });
+
 const a = document.createElement("a");
 a.href = finalDataUrl;
 a.download =
@@ -1957,111 +1887,40 @@ document.body.removeChild(a);
       setTimeout(() => setExporting(false), 80);
     }
   }
-async function createPendingExportForEmail(imageBlob: Blob, email: string) {
-  const storage = getStorage(app);
-
-  const filePath = `pending-exports/${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}.png`;
-
-  const storageRef = ref(storage, filePath);
-
-  await uploadBytes(storageRef, imageBlob, {
-    contentType: "image/png",
-  });
-
-  const imageUrl = await getDownloadURL(storageRef);
-
-const docRef = await addDoc(collection(db, "pendingExports"), {
-  email,
-  imageUrl,
-  projectName,
-  projectType,
-  presetId,
-  exportKind: "image", // 👈 ADD THIS
-  paid: false,
-  emailed: false,
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
-
-  return { exportId: docRef.id, imageUrl };
-}
-async function createPendingMusicExportForEmail(args: {
-  imageBlob: Blob;
-  musicFile: File;
-  email: string;
-  clipStart: number;
-  clipDuration: number;
-}) {
-  const storage = getStorage(app);
-
-  const imagePath = `pending-exports/${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}.png`;
-
-  const imageRef = ref(storage, imagePath);
-
-  await uploadBytes(imageRef, args.imageBlob, {
-    contentType: "image/png",
-  });
-
-  const imageUrl = await getDownloadURL(imageRef);
-
-  const musicPath = `pending-music/${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}-${args.musicFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-
-  const musicRef = ref(storage, musicPath);
-
-  await uploadBytes(musicRef, args.musicFile, {
-    contentType: args.musicFile.type || "audio/mpeg",
-  });
-
-  const audioUrl = await getDownloadURL(musicRef);
-const docRef = await addDoc(collection(db, "pendingExports"), {
-  email: args.email,
-  imageUrl,
-  audioUrl,
-  clipStart,
-  clipDuration,
-  projectName,
-  projectType,
-  presetId,
-  exportKind: "music", // 👈 ADD THIS
-  paid: false,
-  emailed: false,
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
-
-  return { exportId: docRef.id, imageUrl, audioUrl };
-}
 
 async function handleExport() {
-  try {
-    const platform = Capacitor.getPlatform();
-    console.log("platform:", platform);
+  const platform = Capacitor.getPlatform();
+  console.log("platform:", platform);
 
-    if (!currentUser?.uid || !currentUser?.email) {
-      alert("Please log in before exporting.");
-      window.location.href = "/login";
-      return;
+  const isNativeMobile =
+    platform === "android" || platform === "ios";
+
+  if (isNativeMobile) {
+    try {
+      await startPurchaseFlow("export_image");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Purchase failed.");
     }
-
-    await saveCurrentDesignForCheckout();
-
-    const params = new URLSearchParams();
-    params.set("uid", currentUser.uid);
-    params.set("email", currentUser.email);
-
-    // both web and app go to checkout first
-    window.location.href = api(`/api/stripe/checkout-export?${params.toString()}`);
-  } catch (err: any) {
-    console.error(err);
-    alert(err?.message || "Could not start export.");
+    return;
   }
+
+  // 👉 Web flow continues here
+
+  const uid =
+    currentUser?.uid ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+      : "");
+
+  if (typeof window !== "undefined" && uid) {
+    localStorage.setItem("gfxlab_guest_id", uid);
+  }
+
+  await saveCurrentDesignForCheckout();
+  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}`;
 }
+
 async function handleMusicExport() {
   if (!musicFile) {
     alert("Upload music first.");
@@ -2081,45 +1940,41 @@ async function handleMusicExport() {
     return;
   }
 
-  if (!currentUser?.uid || !currentUser?.email) {
-    alert("Please log in before exporting.");
-    window.location.href = "/login";
-    return;
+  const uid =
+    currentUser?.uid ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("gfxlab_guest_id") || crypto.randomUUID()
+      : "");
+
+  if (typeof window !== "undefined" && uid) {
+    localStorage.setItem("gfxlab_guest_id", uid);
   }
 
-  const uid = currentUser.uid;
-  const email = currentUser.email;
+  const file: File = musicFile;
 
   try {
-    const imageBlob = await exportCanvasBlob();
-    if (!imageBlob) {
-      alert("Could not prepare export image.");
-      return;
-    }
+    const uploadedUrl = await uploadMusicToFirebase(file);
+    setUploadedAudioUrl(uploadedUrl);
 
-    const file: File = musicFile;
+    await saveCurrentDesignForCheckout();
 
-    const { exportId, audioUrl } = await createPendingMusicExportForEmail({
-      imageBlob,
-      musicFile: file,
-      email,
+    await savePendingMusicExport({
+      audioBlob: file,
+      fileName: file.name,
+      fileType: file.type || "audio/mpeg",
       clipStart,
       clipDuration,
     });
 
-    setUploadedAudioUrl(audioUrl);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("pending_music_export", "true");
+      sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
+    }
 
-    await saveCurrentDesignForCheckout();
-
-    const params = new URLSearchParams();
-    params.set("uid", uid);
-    params.set("email", email);
-    params.set("exportId", exportId);
-
-    window.location.href = `/api/stripe/checkout-video-export?${params.toString()}`;
-  } catch (err: any) {
+    window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(uid)}`;
+  } catch (err) {
     console.error(err);
-    alert(err?.message || "Could not start music export checkout.");
+    alert("Could not upload music file.");
   }
 }
 async function addImageToCanvas(file: File) {
@@ -2129,7 +1984,7 @@ async function addImageToCanvas(file: File) {
     const src = reader.result as string;
 
     const img = new window.Image();
-  
+    img.crossOrigin = "anonymous";
 
     img.onload = () => {
       const maxWidth = preset.w * 0.7;
@@ -2185,7 +2040,7 @@ async function handleCutoutFile(file: File) {
     if (!src) throw new Error("No cutout image returned");
 
     const img = new window.Image();
-   
+    img.crossOrigin = "anonymous";
 
     img.onload = () => {
       const maxWidth = preset.w * 0.7;
@@ -2556,15 +2411,7 @@ return (
       </div>
 
       <div style={canvasArea}>
-       <div
-  ref={canvasHostRef}
-  style={{
-    ...canvasWrap,
-    minHeight: "100dvh",
-    paddingTop: "env(safe-area-inset-top)",
-    paddingBottom: "env(safe-area-inset-bottom)",
-  }}
->
+        <div ref={canvasHostRef} style={canvasWrap}>
   <input
   ref={cameraInputRef}
   type="file"
@@ -2755,10 +2602,10 @@ return (
       isDesktop
         ? {
             position: "fixed",
-            top: 100,
+            top: 140,
             left: 270,
-            width: 450,
-            maxHeight: "calc(100dvh - 180px)",
+            width: 30,
+            maxHeight: "calc(100vh - 180px)",
             overflowY: "auto",
             zIndex: 180,
             borderRadius: 18,

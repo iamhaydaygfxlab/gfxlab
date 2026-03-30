@@ -1,26 +1,18 @@
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim().replace(/^['"]|['"]$/g, ""),
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim().replace(/^['"]|['"]$/g, ""),
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim().replace(/^['"]|['"]$/g, ""),
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim().replace(/^['"]|['"]$/g, ""),
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim().replace(/^['"]|['"]$/g, ""),
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim().replace(/^['"]|['"]$/g, ""),
+  apiKey: "AIzaSyBAP5Lix5Z-Wi0RTP916EQdyCkiBHFxAm4",
+  authDomain: "gfxlab-3a81c.firebaseapp.com",
+  projectId: "gfxlab-3a81c",
+  storageBucket: "gfxlab-3a81c.firebasestorage.app",
+  messagingSenderId: "540569881746",
+  appId: "1:540569881746:web:7261dea521f3100b672a4b",
 };
 
-if (
-  !firebaseConfig.apiKey ||
-  !firebaseConfig.authDomain ||
-  !firebaseConfig.projectId ||
-  !firebaseConfig.storageBucket ||
-  !firebaseConfig.messagingSenderId ||
-  !firebaseConfig.appId
-) {
-  throw new Error("Firebase public env vars are missing");
-}
-
-export const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const auth = getAuth(app);
 export const db = getFirestore(app);
-
+export const storage = getStorage(app);
