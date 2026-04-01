@@ -56,8 +56,10 @@ function ExportSuccessContent() {
             lineHeight: 1.5,
           }}
         >
-          Your payment went through BOOM!!. When you return to the page you edit will be in "EXPORT" 
-          hold down the image  and save it THANK YOU !! 
+         Export complete.
+Your design was sent to your email.
+Check your inbox and your spam folder.
+It may take a minute to arrive.
         </p>
 
         <Link

@@ -8,11 +8,11 @@ export const metadata: Metadata = {
     title: "GFXlab",
     description:
       "Create covers, flyers, and visuals n seconds. Add music and export for just $5–$8.",
-    url: "https://gfxlab.vercel.app",
+    url: "https://iamhaydaygfxlab.com",
     siteName: "GFXlab",
     images: [
       {
-        url: "https://gfxlab.vercel.app/opengraph-image.png",
+        url: "https://iamhaydaygfxlab.com/opengraph-image.png",
         width: 1920,
         height: 1080,
       },

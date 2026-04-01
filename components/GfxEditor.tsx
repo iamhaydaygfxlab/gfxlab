@@ -397,7 +397,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
 
 async function uploadToFirebase(dataUrl: string) {
   const blob = dataUrlToBlob(dataUrl);
-  const fileRef = ref(storage, `exports/${Date.now()}.png`);
+  const fileRef = ref(storage, `email-exports/${Date.now()}.png`);
   await uploadBytes(fileRef, blob);
   return await getDownloadURL(fileRef);
 }
@@ -1864,18 +1864,7 @@ await fetch("/api/send-email", {
   }),
 });
 
-const a = document.createElement("a");
-a.href = finalDataUrl;
-a.download =
-  projectType === "cover"
-    ? "gfxlab-cover.png"
-    : projectType === "flyer"
-    ? "gfxlab-flyer.png"
-    : "gfxlab-social.png";
 
-document.body.appendChild(a);
-a.click();
-document.body.removeChild(a);
     } catch (err) {
       console.error("Export failed:", err);
       alert("Export failed.");
