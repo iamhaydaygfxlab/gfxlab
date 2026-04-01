@@ -1,6 +1,10 @@
 [
   {
-    "origin": ["http://localhost:3000", "https://gfxlab.vercel.app"],
+    "origin": [
+      "http://localhost:3000",
+      "https://gfxlab.vercel.app",
+      "https://www.iamhaydaygfxlab.com"
+    ],
     "method": ["GET", "HEAD"],
     "responseHeader": ["Content-Type"],
     "maxAgeSeconds": 3600

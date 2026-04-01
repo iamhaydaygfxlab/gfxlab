@@ -1368,7 +1368,8 @@ async function saveProject() {
       items,
       updatedAt: serverTimestamp(),
     };
-
+console.log("ITEMS ABOUT TO SAVE:", items);
+console.log("ITEMS JSON:", JSON.stringify(items, null, 2));
     if (projectId) {
       await updateDoc(doc(db, "projects", projectId), payload);
       return;
