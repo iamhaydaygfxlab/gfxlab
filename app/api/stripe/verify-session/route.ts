@@ -19,7 +19,12 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const secretKey = process.env.STRIPE_SECRET_KEY;
+  const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+
+const secretKey =
+  mode === "live"
+    ? process.env.STRIPE_SECRET_KEY_LIVE
+    : process.env.STRIPE_SECRET_KEY_TEST;
 
     if (!secretKey) {
       return NextResponse.json(

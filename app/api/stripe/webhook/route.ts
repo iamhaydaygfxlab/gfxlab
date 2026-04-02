@@ -94,6 +94,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.text();
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+    console.log("WEBHOOK EVENT TYPE:", event.type);
   } catch (err: any) {
     return new NextResponse(`Webhook Error: ${err?.message || "Unknown error"}`, {
       status: 400,
@@ -102,7 +103,10 @@ export async function POST(req: Request) {
 
   try {
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
+     const session = event.data.object as Stripe.Checkout.Session;
+
+console.log("SESSION METADATA:", session.metadata);
+console.log("SESSION EMAIL:", session.customer_details?.email);
 
       if (session.mode === "payment") {
         const uid =
