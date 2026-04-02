@@ -8,12 +8,12 @@ export async function GET(req: Request) {
 
     const secretKey =
       mode === "live"
-        ? process.env.STRIPE_SECRET_KEY_LIVE
+        ? process.env.STRIPE_SECRET_KEY
         : process.env.STRIPE_SECRET_KEY_TEST;
 
     const priceId =
       mode === "live"
-        ? process.env.STRIPE_EXPORT_PRICE_ID_LIVE
+        ? process.env.STRIPE_EXPORT_PRICE_ID
         : process.env.STRIPE_EXPORT_PRICE_ID_TEST;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;

@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
     const priceId =
       mode === "live"
-        ? process.env.STRIPE_VIDEO_EXPORT_PRICE_ID_LIVE
+        ? process.env.STRIPE_VIDEO_EXPORT_PRICE_ID
         : process.env.STRIPE_VIDEO_EXPORT_PRICE_ID_TEST;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -40,7 +40,7 @@ console.log("VIDEO PRICE RAW:", JSON.stringify(priceId));
 console.log(
   "VIDEO PRICE ENV NAME:",
   mode === "live"
-    ? "STRIPE_VIDEO_EXPORT_PRICE_ID_LIVE"
+    ? "STRIPE_VIDEO_EXPORT_PRICE_ID"
     : "STRIPE_VIDEO_EXPORT_PRICE_ID_TEST"
 );
     form.append("line_items[0][price]", priceId);
