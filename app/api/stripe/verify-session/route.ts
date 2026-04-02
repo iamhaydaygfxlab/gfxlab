@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
 const secretKey =
   mode === "live"
-    ? process.env.STRIPE_SECRET_KEY_LIVE
+    ? process.env.STRIPE_SECRET_KEY
     : process.env.STRIPE_SECRET_KEY_TEST;
 
     if (!secretKey) {

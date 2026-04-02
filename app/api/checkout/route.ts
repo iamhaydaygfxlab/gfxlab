@@ -6,11 +6,11 @@ export const runtime = "nodejs";
 const PRICE_MAP: Record<string, { test: string; live: string }> = {
   export_image: {
     test: process.env.STRIPE_EXPORT_PRICE_ID_TEST ?? "",
-    live: process.env.STRIPE_EXPORT_PRICE_ID_LIVE ?? "",
+    live: process.env.STRIPE_EXPORT_PRICE_ID ?? "",
   },
   export_with_music: {
     test: process.env.STRIPE_VIDEO_EXPORT_PRICE_ID_TEST ?? "",
-    live: process.env.STRIPE_VIDEO_EXPORT_PRICE_ID_LIVE ?? "",
+    live: process.env.STRIPE_VIDEO_EXPORT_PRICE_ID ?? "",
   },
 };
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     const stripeSecretKey =
       mode === "live"
-        ? process.env.STRIPE_SECRET_KEY_LIVE ?? ""
+        ? process.env.STRIPE_SECRET_KEY ?? ""
         : process.env.STRIPE_SECRET_KEY_TEST ?? "";
 
     if (!stripeSecretKey) {

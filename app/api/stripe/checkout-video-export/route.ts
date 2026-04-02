@@ -8,7 +8,7 @@ export async function GET(req: Request) {
 
     const secretKey =
       mode === "live"
-        ? process.env.STRIPE_SECRET_KEY_LIVE
+        ? process.env.STRIPE_SECRET_KEY
         : process.env.STRIPE_SECRET_KEY_TEST;
 
     const priceId =

@@ -68,7 +68,7 @@ export async function POST(req: Request) {
 
   const stripeSecretKey =
     mode === "live"
-      ? process.env.STRIPE_SECRET_KEY_LIVE ?? ""
+      ? process.env.STRIPE_SECRET_KEY ?? ""
       : process.env.STRIPE_SECRET_KEY_TEST ?? "";
 
   const webhookSecret =
