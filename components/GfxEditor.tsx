@@ -187,15 +187,15 @@ function defaultText(): TextItem {
   return {
     id: uid(),
     kind: "text",
-    x: 1500,
-    y: 1300,
+    x: 1600,
+    y: 1600,
     rotation: 0,
-    text: "Create",
+    text: "ADD TEXT",
     fontFamily: "Impact",
-    fontSize: 500,
+    fontSize: 180,
     fontWeight: 800,
     fontStyle: "normal",
-    fill: "#d5ad33",
+    fill: "#ffffff",
     align: "center",
     letterSpacing: 0,
     lineHeight: 1.15,
@@ -287,9 +287,9 @@ function getAngle(p1: { x: number; y: number }, p2: { x: number; y: number }) {
 }
 
 const COVER_PRESETS: SizePreset[] = [
-  { id: "cov-3000", label: "3000 × 3000 (Standard)", w: 3000, h: 3000 },
+  { id: "cov-1600", label: "1600 × 1600 (Recommended)", w: 1600, h: 1600 },
+  { id: "cov-3000", label: "3000 × 3000", w: 3000, h: 3000 },
   { id: "cov-2048", label: "2048 × 2048", w: 2048, h: 2048 },
-  { id: "cov-1600", label: "1600 × 1600", w: 1600, h: 1600 },
 ];
 
 const FLYER_PRESETS: SizePreset[] = [
@@ -513,21 +513,38 @@ const panelReserve =
 
 const workspacePadding = isMobile ? 10 : 20;
 const artboardPadding = isMobile ? 14 : 28;
+const desktopLeftReserve = isDesktop
+  ? tab !== "none"
+    ? 760
+    : 260
+  : 0;
+const view = useMemo(() => {
+  const usableLeft = workspacePadding + desktopLeftReserve;
+  const usableRight = workspacePadding;
+  const usableWidth = Math.max(260, hostSize.w - usableLeft - usableRight);
+  const usableHeight = Math.max(260, hostSize.h - workspacePadding * 2 - panelReserve);
 
-  const view = useMemo(() => {
-    const safeW = Math.max(260, hostSize.w - workspacePadding * 2);
-    const safeH = Math.max(260, hostSize.h - workspacePadding * 2 - panelReserve);
-    const ratio = Math.min(
-      (safeW - artboardPadding * 2) / preset.w,
-      (safeH - artboardPadding * 2) / preset.h
-    );
-    const scaledRatio = Math.max(0.02, ratio);
-    const w = Math.max(120, Math.round(preset.w * scaledRatio));
-    const h = Math.max(120, Math.round(preset.h * scaledRatio));
-    const x = Math.round((hostSize.w - w) / 2);
-    const y = workspacePadding + 10;
-    return { w, h, ratio: scaledRatio, x, y };
-  }, [hostSize, panelReserve, preset, workspacePadding, artboardPadding]);
+  const ratio = Math.min(
+    (usableWidth - artboardPadding * 2) / preset.w,
+    (usableHeight - artboardPadding * 2) / preset.h
+  );
+
+  const scaledRatio = Math.max(0.02, ratio);
+  const w = Math.max(120, Math.round(preset.w * scaledRatio));
+  const h = Math.max(120, Math.round(preset.h * scaledRatio));
+
+  const x = Math.round(usableLeft + (usableWidth - w) / 2);
+  const y = workspacePadding + 10;
+
+  return { w, h, ratio: scaledRatio, x, y };
+}, [
+  hostSize,
+  panelReserve,
+  preset,
+  workspacePadding,
+  artboardPadding,
+  desktopLeftReserve,
+]);
 
   const selectedItem = useMemo(
     () => items.find((i) => i.id === selectedId) ?? null,
@@ -2592,10 +2609,10 @@ return (
       isDesktop
         ? {
             position: "fixed",
-            top: 140,
+            top: 100,
             left: 270,
-            width: 30,
-            maxHeight: "calc(100vh - 180px)",
+            width: 450,
+            maxHeight: "calc(100vh - 190px)",
             overflowY: "auto",
             zIndex: 180,
             borderRadius: 18,

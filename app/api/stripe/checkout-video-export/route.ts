@@ -4,16 +4,26 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   try {
-    const secretKey = process.env.STRIPE_SECRET_KEY;
-    const priceId = process.env.STRIPE_VIDEO_EXPORT_PRICE_ID;
+    const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+
+    const secretKey =
+      mode === "live"
+        ? process.env.STRIPE_SECRET_KEY_LIVE
+        : process.env.STRIPE_SECRET_KEY_TEST;
+
+    const priceId =
+      mode === "live"
+        ? process.env.STRIPE_VIDEO_EXPORT_PRICE_ID_LIVE
+        : process.env.STRIPE_VIDEO_EXPORT_PRICE_ID_TEST;
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
     if (!secretKey) {
-      return new NextResponse("Missing STRIPE_SECRET_KEY", { status: 500 });
+      return new NextResponse("Missing Stripe secret key", { status: 500 });
     }
 
     if (!priceId) {
-      return new NextResponse("Missing STRIPE_VIDEO_EXPORT_PRICE_ID", { status: 500 });
+      return new NextResponse("Missing video export price id", { status: 500 });
     }
 
     if (!appUrl) {
@@ -27,7 +37,10 @@ export async function GET(req: Request) {
     form.append("mode", "payment");
     form.append("line_items[0][price]", priceId);
     form.append("line_items[0][quantity]", "1");
-form.append("success_url", `${appUrl}/editor?export=music-success&session_id={CHECKOUT_SESSION_ID}`);
+    form.append(
+      "success_url",
+      `${appUrl}/editor?export=music-success&session_id={CHECKOUT_SESSION_ID}`
+    );
     form.append("cancel_url", `${appUrl}/editor?export=cancel`);
 
     if (guestId) form.append("metadata[guestId]", guestId);

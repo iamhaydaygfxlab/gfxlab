@@ -3,12 +3,37 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 export async function GET(req: Request) {
   try {
-    const url = new URL(req.url);
+    const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
 
+    const secretKey =
+      mode === "live"
+        ? process.env.STRIPE_SECRET_KEY_LIVE
+        : process.env.STRIPE_SECRET_KEY_TEST;
+
+    const proPriceId =
+      mode === "live"
+        ? process.env.STRIPE_PRO_PRICE_ID_LIVE
+        : process.env.STRIPE_PRO_PRICE_ID_TEST;
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    if (!secretKey) {
+      return new NextResponse("Missing Stripe secret key", { status: 500 });
+    }
+
+    if (!proPriceId) {
+      return new NextResponse("Missing Pro price id", { status: 500 });
+    }
+
+    if (!appUrl) {
+      return new NextResponse("Missing NEXT_PUBLIC_APP_URL", { status: 500 });
+    }
+
+    const stripe = new Stripe(secretKey);
+
+    const url = new URL(req.url);
     const uid = url.searchParams.get("uid");
     const email = url.searchParams.get("email");
 
@@ -28,12 +53,12 @@ export async function GET(req: Request) {
       customer: customer.id,
       line_items: [
         {
-          price: process.env.STRIPE_PRO_PRICE_ID!,
+          price: proPriceId,
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/editor?pro=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/?pro=cancel`,
+      success_url: `${appUrl}/editor?pro=success`,
+      cancel_url: `${appUrl}/?pro=cancel`,
       allow_promotion_codes: true,
     });
 
