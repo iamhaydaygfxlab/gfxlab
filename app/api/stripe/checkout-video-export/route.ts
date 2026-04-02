@@ -35,6 +35,14 @@ export async function GET(req: Request) {
 const exportId = url.searchParams.get("exportId");
     const form = new URLSearchParams();
     form.append("mode", "payment");
+    console.log("VIDEO MODE:", mode);
+console.log("VIDEO PRICE RAW:", JSON.stringify(priceId));
+console.log(
+  "VIDEO PRICE ENV NAME:",
+  mode === "live"
+    ? "STRIPE_VIDEO_EXPORT_PRICE_ID_LIVE"
+    : "STRIPE_VIDEO_EXPORT_PRICE_ID_TEST"
+);
     form.append("line_items[0][price]", priceId);
     form.append("line_items[0][quantity]", "1");
     form.append(
