@@ -6,8 +6,17 @@ import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY ?? "";
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+
+const stripeSecretKey =
+  mode === "live"
+    ? process.env.STRIPE_SECRET_KEY_LIVE ?? ""
+    : process.env.STRIPE_SECRET_KEY_TEST ?? "";
+
+const webhookSecret =
+  mode === "live"
+    ? process.env.STRIPE_WEBHOOK_SECRET_LIVE ?? ""
+    : process.env.STRIPE_WEBHOOK_SECRET_TEST ?? "";
 const resendKey = process.env.RESEND_API_KEY ?? "";
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
