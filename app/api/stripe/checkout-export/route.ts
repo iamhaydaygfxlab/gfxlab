@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   try {
-    const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+    const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "live";
 
     const secretKey =
       mode === "live"

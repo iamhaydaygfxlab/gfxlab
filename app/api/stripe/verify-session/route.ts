@@ -19,7 +19,7 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-  const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+  const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "live";
 
 const secretKey =
   mode === "live"

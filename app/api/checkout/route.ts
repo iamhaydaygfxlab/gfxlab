@@ -16,7 +16,7 @@ const PRICE_MAP: Record<string, { test: string; live: string }> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+    const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "live";
 
     const stripeSecretKey =
       mode === "live"

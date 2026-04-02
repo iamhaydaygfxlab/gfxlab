@@ -64,7 +64,7 @@ async function renderMp4FromUrls(args: {
 }
 
 export async function POST(req: Request) {
-  const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+  const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "live";
 
   const stripeSecretKey =
     mode === "live"
