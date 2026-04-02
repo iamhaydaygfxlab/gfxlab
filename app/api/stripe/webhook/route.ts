@@ -6,27 +6,7 @@ import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
-const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
 
-const stripeSecretKey =
-  mode === "live"
-    ? process.env.STRIPE_SECRET_KEY_LIVE ?? ""
-    : process.env.STRIPE_SECRET_KEY_TEST ?? "";
-
-const webhookSecret =
-  mode === "live"
-    ? process.env.STRIPE_WEBHOOK_SECRET_LIVE ?? ""
-    : process.env.STRIPE_WEBHOOK_SECRET_TEST ?? "";
-const resendKey = process.env.RESEND_API_KEY ?? "";
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-
-if (!stripeSecretKey) throw new Error("Missing STRIPE_SECRET_KEY");
-if (!webhookSecret) throw new Error("Missing STRIPE_WEBHOOK_SECRET");
-if (!resendKey) throw new Error("Missing RESEND_API_KEY");
-if (!appUrl) throw new Error("Missing NEXT_PUBLIC_APP_URL");
-
-const stripe = new Stripe(stripeSecretKey);
-const resend = new Resend(resendKey);
 
 async function uploadBufferToStorage(args: {
   buffer: Buffer;
@@ -54,6 +34,7 @@ async function renderMp4FromUrls(args: {
   audioUrl: string;
   clipStart: number;
   clipDuration: number;
+  appUrl: string;
 }) {
   const imageRes = await fetch(args.imageUrl);
   if (!imageRes.ok) {
@@ -68,7 +49,7 @@ async function renderMp4FromUrls(args: {
   formData.append("clipStart", String(args.clipStart));
   formData.append("clipDuration", String(args.clipDuration));
 
-  const renderRes = await fetch(`${appUrl}/api/render-video`, {
+ const renderRes = await fetch(`${args.appUrl}/api/render-video`, {
     method: "POST",
     body: formData,
   });
@@ -83,6 +64,40 @@ async function renderMp4FromUrls(args: {
 }
 
 export async function POST(req: Request) {
+  const mode = process.env.NEXT_PUBLIC_STRIPE_MODE ?? "test";
+
+  const stripeSecretKey =
+    mode === "live"
+      ? process.env.STRIPE_SECRET_KEY_LIVE ?? ""
+      : process.env.STRIPE_SECRET_KEY_TEST ?? "";
+
+  const webhookSecret =
+    mode === "live"
+      ? process.env.STRIPE_WEBHOOK_SECRET_LIVE ?? ""
+      : process.env.STRIPE_WEBHOOK_SECRET_TEST ?? "";
+
+  const resendKey = process.env.RESEND_API_KEY ?? "";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  if (!stripeSecretKey) {
+    return new NextResponse("Missing Stripe secret key", { status: 500 });
+  }
+
+  if (!webhookSecret) {
+    return new NextResponse("Missing Stripe webhook secret", { status: 500 });
+  }
+
+  if (!resendKey) {
+    return new NextResponse("Missing RESEND_API_KEY", { status: 500 });
+  }
+
+  if (!appUrl) {
+    return new NextResponse("Missing NEXT_PUBLIC_APP_URL", { status: 500 });
+  }
+
+  const stripe = new Stripe(stripeSecretKey);
+  const resend = new Resend(resendKey);
+
   const sig = req.headers.get("stripe-signature");
 
   if (!sig) {
@@ -191,12 +206,13 @@ console.log("SESSION EMAIL:", session.customer_details?.email);
             let finalVideoUrl: string | null = null;
 
             if (exportKind === "music" && imageUrl && audioUrl) {
-              const mp4Buffer = await renderMp4FromUrls({
-                imageUrl,
-                audioUrl,
-                clipStart,
-                clipDuration,
-              });
+        const mp4Buffer = await renderMp4FromUrls({
+  imageUrl,
+  audioUrl,
+  clipStart,
+  clipDuration,
+  appUrl,
+});
 
               finalVideoUrl = await uploadBufferToStorage({
                 buffer: mp4Buffer,
