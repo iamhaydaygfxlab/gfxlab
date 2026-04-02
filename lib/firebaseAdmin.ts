@@ -11,6 +11,7 @@ const firebaseAdminConfig = {
 const adminApp =
   getApps()[0] ||
   initializeApp({
+    
     credential: cert(firebaseAdminConfig),
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });

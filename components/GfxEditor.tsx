@@ -20,16 +20,18 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   increment,
   onSnapshot,
-  serverTimestamp,
-  updateDoc,
-  query,
-  where,
   orderBy,
   limit,
-  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
 } from "firebase/firestore";
+
 import { startPurchaseFlow } from "@/lib/startPurchaseFlow";
 import { api } from "@/lib/api";
 import { app, db, storage } from "@/lib/firebase";
@@ -409,6 +411,7 @@ export default function GfxEditor() {
   const [paid, setPaid] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
 const [projectLoaded, setProjectLoaded] = useState(false);
@@ -965,13 +968,14 @@ useEffect(() => {
         return;
       }
 
-      if (paidMusicExport === "true") {
-        await exportBundleFiles();
-        sessionStorage.removeItem("paid_music_export");
-        sessionStorage.removeItem("pending_music_export");
-        await deletePendingDesign("gfxlab_pending_export_design");
-        await deletePendingMusicExport();
-      }
+if (paidMusicExport === "true") {
+  sessionStorage.removeItem("paid_music_export");
+  sessionStorage.removeItem("pending_music_export");
+  sessionStorage.removeItem("pending_uploaded_audio_url");
+  await deletePendingDesign("gfxlab_pending_export_design");
+  await deletePendingMusicExport();
+  setSuccessMessage("Payment received. Your music export is being delivered by email.");
+}
     }, 1200);
 
     return () => window.clearTimeout(t);
@@ -1923,9 +1927,32 @@ async function handleExport() {
   if (typeof window !== "undefined" && uid) {
     localStorage.setItem("gfxlab_guest_id", uid);
   }
+await saveCurrentDesignForCheckout();
 
-  await saveCurrentDesignForCheckout();
-  window.location.href = `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}`;
+await saveCurrentDesignForCheckout();
+
+const exportId = crypto.randomUUID();
+
+const blob = await exportCanvasBlob();
+if (!blob) {
+  alert("Could not prepare export image.");
+  return;
+}
+
+const fileRef = ref(storage, `email-exports/${exportId}.png`);
+await uploadBytes(fileRef, blob, { contentType: "image/png" });
+const imageUrl = await getDownloadURL(fileRef);
+
+await setDoc(doc(db, "pendingExports", exportId), {
+  guestId: uid,
+  imageUrl,
+  exportKind: "image",
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
+
+window.location.href =
+  `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}&exportId=${encodeURIComponent(exportId)}`;
 }
 
 async function handleMusicExport() {
@@ -1978,7 +2005,42 @@ async function handleMusicExport() {
       sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
     }
 
-    window.location.href = `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(uid)}`;
+  const exportId = crypto.randomUUID();
+
+await setDoc(doc(db, "pendingExports", exportId), {
+  guestId: uid,
+  exportKind: "music",
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
+
+await saveCurrentDesignForCheckout();
+
+
+
+const blob = await exportCanvasBlob({ width: 1080, height: 1080 });
+if (!blob) {
+  alert("Could not prepare cover image.");
+  return;
+}
+
+const fileRef = ref(storage, `email-exports/${exportId}.png`);
+await uploadBytes(fileRef, blob, { contentType: "image/png" });
+const imageUrl = await getDownloadURL(fileRef);
+
+await setDoc(doc(db, "pendingExports", exportId), {
+  guestId: uid,
+  imageUrl,
+  audioUrl: uploadedAudioUrl,
+  exportKind: "music",
+  clipStart,
+  clipDuration,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
+
+window.location.href =
+  `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(uid)}&exportId=${encodeURIComponent(exportId)}`;
   } catch (err) {
     console.error(err);
     alert("Could not upload music file.");

@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const guestId = url.searchParams.get("guestId");
-
+const exportId = url.searchParams.get("exportId");
     const form = new URLSearchParams();
     form.append("mode", "payment");
     form.append("line_items[0][price]", priceId);
@@ -44,6 +44,7 @@ export async function GET(req: Request) {
     form.append("cancel_url", `${appUrl}/editor?export=cancel`);
 
     if (guestId) form.append("metadata[guestId]", guestId);
+    if (exportId) form.append("metadata[exportId]", exportId);
     form.append("metadata[exportType]", "music_bundle");
 
     const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {

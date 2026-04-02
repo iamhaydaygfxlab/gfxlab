@@ -104,7 +104,7 @@ export async function POST(req: Request) {
   try {
     if (event.type === "checkout.session.completed") {
      const session = event.data.object as Stripe.Checkout.Session;
-
+console.log("SESSION MODE:", session.mode);
 console.log("SESSION METADATA:", session.metadata);
 console.log("SESSION EMAIL:", session.customer_details?.email);
 
@@ -154,11 +154,18 @@ console.log("SESSION EMAIL:", session.customer_details?.email);
           );
         }
 
-        if (exportId && email) {
-          const exportRef = adminDb.collection("pendingExports").doc(exportId);
-          const exportSnap = await exportRef.get();
+       if (exportId && email) {
+  console.log("resolved exportId:", exportId);
+  console.log("resolved email:", email);
+  console.log("Looking for pending export doc:", exportId);
 
-          if (exportSnap.exists) {
+  const exportRef = adminDb.collection("pendingExports").doc(exportId);
+  const exportSnap = await exportRef.get();
+
+  console.log("pending export exists:", exportSnap.exists);
+  console.log("pending export data:", exportSnap.data());
+
+  if (exportSnap.exists) {
             const data = exportSnap.data() || {};
 
             const imageUrl =
