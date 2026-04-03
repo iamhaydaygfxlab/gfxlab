@@ -1,5 +1,7 @@
 "use client";
-  
+ import { Capacitor } from "@capacitor/core";
+import { buyMobileProduct } from "../lib/mobilePurchases";
+import { MOBILE_PRODUCTS } from "../lib/mobileProducts"; 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Konva from "konva";
 import {
@@ -42,7 +44,7 @@ import ImagePanel, { type ImageAdjustments } from "./ImagePanel";
 import LayersPanel from "./LayersPanel";
 import { type FireTemplate } from "@/lib/templates";
 import MusicClipPicker from "./MusicClipPicker";
-import { Capacitor } from "@capacitor/core";
+
 import { FilePicker } from "@capawesome/capacitor-file-picker";
 
 
@@ -1901,22 +1903,7 @@ await fetch("/api/send-email", {
 
 async function handleExport() {
   const platform = Capacitor.getPlatform();
-  console.log("platform:", platform);
-
-  const isNativeMobile =
-    platform === "android" || platform === "ios";
-
-  if (isNativeMobile) {
-    try {
-      await startPurchaseFlow("export_image");
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Purchase failed.");
-    }
-    return;
-  }
-
-  // 👉 Web flow continues here
+  const isNativeMobile = platform === "android" || platform === "ios";
 
   const uid =
     currentUser?.uid ||
@@ -1927,32 +1914,45 @@ async function handleExport() {
   if (typeof window !== "undefined" && uid) {
     localStorage.setItem("gfxlab_guest_id", uid);
   }
-await saveCurrentDesignForCheckout();
 
-await saveCurrentDesignForCheckout();
+  try {
+    if (isNativeMobile) {
+      await buyMobileProduct(MOBILE_PRODUCTS.IMAGE_EXPORT);
+    }
 
-const exportId = crypto.randomUUID();
+    await saveCurrentDesignForCheckout();
 
-const blob = await exportCanvasBlob();
-if (!blob) {
-  alert("Could not prepare export image.");
-  return;
-}
+    const exportId = crypto.randomUUID();
 
-const fileRef = ref(storage, `email-exports/${exportId}.png`);
-await uploadBytes(fileRef, blob, { contentType: "image/png" });
-const imageUrl = await getDownloadURL(fileRef);
+    const blob = await exportCanvasBlob();
+    if (!blob) {
+      alert("Could not prepare export image.");
+      return;
+    }
 
-await setDoc(doc(db, "pendingExports", exportId), {
-  guestId: uid,
-  imageUrl,
-  exportKind: "image",
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
+    const fileRef = ref(storage, `email-exports/${exportId}.png`);
+    await uploadBytes(fileRef, blob, { contentType: "image/png" });
+    const imageUrl = await getDownloadURL(fileRef);
 
-window.location.href =
-  `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}&exportId=${encodeURIComponent(exportId)}`;
+    await setDoc(doc(db, "pendingExports", exportId), {
+      guestId: uid,
+      imageUrl,
+      exportKind: "image",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    if (isNativeMobile) {
+      alert("Export purchased successfully.");
+      return;
+    }
+
+    window.location.href =
+      `/api/stripe/checkout-export?guestId=${encodeURIComponent(uid)}&exportId=${encodeURIComponent(exportId)}`;
+  } catch (err: any) {
+    console.error(err);
+    alert(err?.message || "Export failed.");
+  }
 }
 
 async function handleMusicExport() {
@@ -1964,16 +1964,6 @@ async function handleMusicExport() {
   const platform = Capacitor.getPlatform();
   const isNativeMobile = platform === "android" || platform === "ios";
 
-  if (isNativeMobile) {
-    try {
-      await startPurchaseFlow("export_with_music");
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Purchase failed.");
-    }
-    return;
-  }
-
   const uid =
     currentUser?.uid ||
     (typeof window !== "undefined"
@@ -1984,9 +1974,12 @@ async function handleMusicExport() {
     localStorage.setItem("gfxlab_guest_id", uid);
   }
 
-  const file: File = musicFile;
-
   try {
+    if (isNativeMobile) {
+      await buyMobileProduct(MOBILE_PRODUCTS.MUSIC_EXPORT);
+    }
+
+    const file: File = musicFile;
     const uploadedUrl = await uploadMusicToFirebase(file);
     setUploadedAudioUrl(uploadedUrl);
 
@@ -2005,45 +1998,39 @@ async function handleMusicExport() {
       sessionStorage.setItem("pending_uploaded_audio_url", uploadedUrl);
     }
 
-  const exportId = crypto.randomUUID();
+    const exportId = crypto.randomUUID();
 
-await setDoc(doc(db, "pendingExports", exportId), {
-  guestId: uid,
-  exportKind: "music",
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
+    const blob = await exportCanvasBlob({ width: 1080, height: 1080 });
+    if (!blob) {
+      alert("Could not prepare cover image.");
+      return;
+    }
 
-await saveCurrentDesignForCheckout();
+    const fileRef = ref(storage, `email-exports/${exportId}.png`);
+    await uploadBytes(fileRef, blob, { contentType: "image/png" });
+    const imageUrl = await getDownloadURL(fileRef);
 
+    await setDoc(doc(db, "pendingExports", exportId), {
+      guestId: uid,
+      imageUrl,
+      audioUrl: uploadedUrl,
+      exportKind: "music",
+      clipStart,
+      clipDuration,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
 
+    if (isNativeMobile) {
+      alert("Music export purchased successfully.");
+      return;
+    }
 
-const blob = await exportCanvasBlob({ width: 1080, height: 1080 });
-if (!blob) {
-  alert("Could not prepare cover image.");
-  return;
-}
-
-const fileRef = ref(storage, `email-exports/${exportId}.png`);
-await uploadBytes(fileRef, blob, { contentType: "image/png" });
-const imageUrl = await getDownloadURL(fileRef);
-
-await setDoc(doc(db, "pendingExports", exportId), {
-  guestId: uid,
-  imageUrl,
-  audioUrl: uploadedAudioUrl,
-  exportKind: "music",
-  clipStart,
-  clipDuration,
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
-
-window.location.href =
-  `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(uid)}&exportId=${encodeURIComponent(exportId)}`;
-  } catch (err) {
+    window.location.href =
+      `/api/stripe/checkout-video-export?guestId=${encodeURIComponent(uid)}&exportId=${encodeURIComponent(exportId)}`;
+  } catch (err: any) {
     console.error(err);
-    alert("Could not upload music file.");
+    alert(err?.message || "Could not upload music file.");
   }
 }
 async function addImageToCanvas(file: File) {

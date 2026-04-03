@@ -9,13 +9,21 @@ export async function initMobilePurchases() {
   if (platform === "web") return;
   if (configured) return;
 
+  const appleKey = process.env.NEXT_PUBLIC_REVENUECAT_APPLE_API_KEY;
+  const googleKey = process.env.NEXT_PUBLIC_REVENUECAT_GOOGLE_API_KEY;
+
+  if (platform === "ios" && !appleKey) {
+    throw new Error("Missing NEXT_PUBLIC_REVENUECAT_APPLE_API_KEY");
+  }
+
+  if (platform === "android" && !googleKey) {
+    throw new Error("Missing NEXT_PUBLIC_REVENUECAT_GOOGLE_API_KEY");
+  }
+
   await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG });
 
   await Purchases.configure({
-    apiKey:
-      platform === "ios"
-        ? process.env.NEXT_PUBLIC_REVENUECAT_APPLE_API_KEY!
-        : process.env.NEXT_PUBLIC_REVENUECAT_GOOGLE_API_KEY!,
+    apiKey: platform === "ios" ? appleKey! : googleKey!,
     appUserID: undefined, // later you can pass Firebase uid here
   });
 
@@ -40,8 +48,7 @@ export async function buyMobileProduct(productId: string) {
     throw new Error(`Product not found in RevenueCat offerings: ${productId}`);
   }
 
-  const result = await Purchases.purchasePackage({ aPackage: pkg });
-  return result;
+  return await Purchases.purchasePackage({ aPackage: pkg });
 }
 
 export async function restoreMobilePurchases() {
