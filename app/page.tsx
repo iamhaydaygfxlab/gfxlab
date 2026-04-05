@@ -141,28 +141,9 @@ const tileBtn = {
           </button>
 
          {!isNative && (
-  <Link
-    href="/custom"
-    style={{
-      width: "220px",
-      height: "50px",
-      borderRadius: "14px",
-      border: "1px solid rgba(255,255,255,0.18)",
-     background:
-                "linear-gradient(90deg, rgba(209,177,90,0.95) 0%, rgba(120,92,35,0.9) 45%, rgba(0,0,0,0.95) 100%)",
-              
-      color: "#ffffff",
-      fontWeight: 700,
-      fontSize: "16px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      textDecoration: "none",
-      backdropFilter: "blur(4px)",
-    }}
-  >
-    CUSTOM FORM  
-  </Link>
+ <Link href="/custom" style={tileBtn}>
+  CUSTOM FORM
+</Link>
 )}
 <button
   style={tileBtn}
