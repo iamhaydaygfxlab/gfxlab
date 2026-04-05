@@ -1877,7 +1877,7 @@ await fetch("/api/send-email", {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    to: currentUser?.email,
+    to: currentUser?.email || guestEmail.trim(),
     projectName:
       projectType === "cover"
         ? "gfxlab-cover"
