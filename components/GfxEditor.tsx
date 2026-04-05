@@ -2423,6 +2423,11 @@ return (
           >
             Redo
           </button>
+          {currentUser && (
+  <button style={smallHeaderBtn} onClick={handleLogout}>
+    Log Out
+  </button>
+)}
           <button
   style={{
     ...smallHeaderBtn,
