@@ -34,32 +34,5 @@ export default function EditorPage() {
     return <div style={{ padding: 40, color: "#fff" }}>Loading...</div>;
   }
 
-  // ✅ NOT LOGGED IN
-  if (!currentUser) {
-    return (
-      <div
-        style={{
-          minHeight: "100dvh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#0b0b0b",
-          color: "#fff",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>
-            Sign in required
-          </div>
-
-          <button onClick={() => (window.location.href = "/login")}>
-            Log In
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ LOGGED IN → LOAD EDITOR
-  return <GfxEditor />;
+  return <GfxEditor currentUser={currentUser} />;
 }

@@ -406,15 +406,14 @@ async function uploadToFirebase(dataUrl: string) {
   return await getDownloadURL(fileRef);
 }
 "CONST"
-
-export default function GfxEditor() {
+export default function GfxEditor({ currentUser }: { currentUser: any }) {
   const [tab, setTab] = useState<MobileTab>("assets");
   const [cutoutLoading, setCutoutLoading] = useState(false);
   const [paid, setPaid] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+
   const [authChecked, setAuthChecked] = useState(false);
 const [projectLoaded, setProjectLoaded] = useState(false);
   const [checkoutRestoreReady, setCheckoutRestoreReady] = useState(false);
@@ -659,7 +658,6 @@ useEffect(() => {
       unsubDoc = null;
     }
 
-    setCurrentUser(user ?? null);
     setAuthChecked(true);
 
     if (!user) {
