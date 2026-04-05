@@ -1,8 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "ignoreDeprecations": "6.0",
-    "lib": [
+  "lib": [
       "dom",
       "dom.iterable",
       "esnext"
