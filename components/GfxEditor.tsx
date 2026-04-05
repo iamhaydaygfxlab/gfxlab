@@ -413,6 +413,8 @@ export default function GfxEditor({ currentUser }: { currentUser: any }) {
   const [isDesktop, setIsDesktop] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [guestEmail, setGuestEmail] = useState("");
+const [showGuestEmailModal, setShowGuestEmailModal] = useState(false);
 
   const [authChecked, setAuthChecked] = useState(false);
 const [projectLoaded, setProjectLoaded] = useState(false);
@@ -1903,6 +1905,11 @@ async function handleExport() {
   const platform = Capacitor.getPlatform();
   const isNativeMobile = platform === "android" || platform === "ios";
 
+  if (!currentUser && !guestEmail.trim()) {
+    setShowGuestEmailModal(true);
+    return;
+  }
+
   const uid =
     currentUser?.uid ||
     (typeof window !== "undefined"
@@ -1934,6 +1941,7 @@ async function handleExport() {
 
     await setDoc(doc(db, "pendingExports", exportId), {
       guestId: uid,
+      email: currentUser?.email || guestEmail.trim(),
       imageUrl,
       exportKind: "image",
       createdAt: serverTimestamp(),
@@ -1952,7 +1960,6 @@ async function handleExport() {
     alert(err?.message || "Export failed.");
   }
 }
-
 async function handleMusicExport() {
   if (!musicFile) {
     alert("Upload music first.");
@@ -2355,6 +2362,7 @@ function handleStartFresh() {
   setProjectId(null);
   setTab("assets");
 }
+
 return (
   <div
     style={{
@@ -2638,6 +2646,102 @@ return (
             </Layer>
           </Stage>
         </div>
+        {showGuestEmailModal && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.75)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 9999,
+      padding: "20px",
+    }}
+  >
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "420px",
+        background: "#111",
+        border: "1px solid rgba(255,255,255,0.12)",
+        borderRadius: "18px",
+        padding: "24px",
+        color: "#fff",
+        display: "grid",
+        gap: "14px",
+      }}
+    >
+      <div style={{ fontSize: "22px", fontWeight: 900 }}>
+        Enter your email
+      </div>
+
+      <div style={{ fontSize: "14px", color: "rgba(255,255,255,0.75)" }}>
+        We’ll send your final export to this email after checkout.
+      </div>
+
+      <input
+        type="email"
+        placeholder="you@example.com"
+        value={guestEmail}
+        onChange={(e) => setGuestEmail(e.target.value)}
+        style={{
+          width: "100%",
+          height: "46px",
+          borderRadius: "12px",
+          border: "1px solid rgba(255,255,255,0.18)",
+          background: "#1a1a1a",
+          color: "#fff",
+          padding: "0 14px",
+          fontSize: "15px",
+          outline: "none",
+        }}
+      />
+
+      <div style={{ display: "flex", gap: "10px" }}>
+        <button
+          onClick={() => setShowGuestEmailModal(false)}
+          style={{
+            flex: 1,
+            height: "44px",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.18)",
+            background: "transparent",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={async () => {
+            if (!guestEmail.trim()) {
+              alert("Please enter your email.");
+              return;
+            }
+
+            setShowGuestEmailModal(false);
+            await handleExport();
+          }}
+          style={{
+            flex: 1,
+            height: "44px",
+            borderRadius: "12px",
+            border: "none",
+            background:
+              "linear-gradient(90deg, rgba(209,177,90,0.95) 0%, rgba(120,92,35,0.9) 45%, rgba(0,0,0,0.95) 100%)",
+            color: "#fff",
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
 
 {!isDesktop && (
